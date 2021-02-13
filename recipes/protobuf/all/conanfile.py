@@ -72,7 +72,7 @@ class ProtobufConan(ConanFile):
             self._cmake.definitions["CMAKE_INSTALL_CMAKEDIR"] = self._cmake_install_base_path.replace("\\", "/")
             self._cmake.definitions["protobuf_WITH_ZLIB"] = self.options.with_zlib
             self._cmake.definitions["protobuf_BUILD_TESTS"] = False
-            self._cmake.definitions["protobuf_BUILD_PROTOC_BINARIES"] = True
+            self._cmake.definitions["protobuf_BUILD_PROTOC_BINARIES"] = not tools.cross_building(self.settings)
             self._cmake.definitions["protobuf_BUILD_LIBPROTOC"] = True
             if self.settings.compiler == "Visual Studio":
                 self._cmake.definitions["protobuf_MSVC_STATIC_RUNTIME"] = "MT" in str(self.settings.compiler.runtime)
@@ -177,6 +177,8 @@ if(DEFINED Protobuf_SRC_ROOT_FOLDER)""",
             self.cpp_info.components["libprotobuf"].system_libs.append("pthread")
             if self._is_clang_x86 or "arm" in str(self.settings.arch):
                 self.cpp_info.components["libprotobuf"].system_libs.append("atomic")
+        if self.settings.os == "Android":
+            self.cpp_info.components["libprotobuf"].system_libs.append("log")
         if self.settings.os == "Windows":
             if self.options.shared:
                 self.cpp_info.components["libprotobuf"].defines = ["PROTOBUF_USE_DLLS"]
@@ -196,12 +198,13 @@ if(DEFINED Protobuf_SRC_ROOT_FOLDER)""",
         self.cpp_info.components["libprotoc"].libs = [lib_prefix + "protoc" + lib_suffix]
         self.cpp_info.components["libprotoc"].requires = ["libprotobuf"]
 
-        self.cpp_info.components["protoc"].name = "protoc"
-        self.cpp_info.components["protoc"].requires.extend(["libprotoc", "libprotobuf"])
+        if not tools.cross_building(self.settings):
+            self.cpp_info.components["protoc"].name = "protoc"
+            self.cpp_info.components["protoc"].requires.extend(["libprotoc", "libprotobuf"])
 
-        bindir = os.path.join(self.package_folder, "bin")
-        self.output.info("Appending PATH environment variable: {}".format(bindir))
-        self.env_info.PATH.append(bindir)
+            bindir = os.path.join(self.package_folder, "bin")
+            self.output.info("Appending PATH environment variable: {}".format(bindir))
+            self.env_info.PATH.append(bindir)
 
         if self.options.lite:
             self.cpp_info.components["libprotobuf-lite"].names["cmake_find_package"] = "libprotobuf-lite"
@@ -215,6 +218,8 @@ if(DEFINED Protobuf_SRC_ROOT_FOLDER)""",
             if self.settings.os == "Windows":
                 if self.options.shared:
                     self.cpp_info.components["libprotobuf-lite"].defines = ["PROTOBUF_USE_DLLS"]
+            if self.settings.os == "Android":
+                self.cpp_info.components["libprotobuf-lite"].system_libs.append("log")
 
             self.cpp_info.components["libprotobuf-lite"].builddirs = [self._cmake_install_base_path]
             self.cpp_info.components["libprotobuf-lite"].build_modules.extend([

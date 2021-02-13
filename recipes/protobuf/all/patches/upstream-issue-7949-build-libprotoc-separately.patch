@@ -1,0 +1,48 @@
+From c8f76331abf682c289fa79f05b2ee39cc7bf5a48 Mon Sep 17 00:00:00 2001
+From: Daniel Joos <daniel@joosweb.de>
+Date: Sat, 10 Oct 2020 00:54:39 +0200
+Subject: [PATCH] Adds a CMake option to build `libprotoc` separately (#7949)
+
+This exposes the variable `protobuf_BUILD_LIBPROTOC` as CMake option to be able to build libprotoc without building the protoc binary.
+---
+ cmake/CMakeLists.txt | 3 +--
+ cmake/install.cmake  | 4 ++--
+ 2 files changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/cmake/CMakeLists.txt b/cmake/CMakeLists.txt
+index 65364116a7..52661f522d 100644
+--- a/cmake/CMakeLists.txt
++++ b/cmake/CMakeLists.txt
+@@ -44,6 +44,7 @@ option(protobuf_BUILD_TESTS "Build tests" ON)
+ option(protobuf_BUILD_CONFORMANCE "Build conformance tests" OFF)
+ option(protobuf_BUILD_EXAMPLES "Build examples" OFF)
+ option(protobuf_BUILD_PROTOC_BINARIES "Build libprotoc and protoc compiler" ON)
++option(protobuf_BUILD_LIBPROTOC "Build libprotoc" OFF)
+ if (BUILD_SHARED_LIBS)
+   set(protobuf_BUILD_SHARED_LIBS_DEFAULT ON)
+ else (BUILD_SHARED_LIBS)
+@@ -64,8 +65,6 @@ include(protobuf-options.cmake)
+ # Overrides for option dependencies
+ if (protobuf_BUILD_PROTOC_BINARIES OR protobuf_BUILD_TESTS)
+   set(protobuf_BUILD_LIBPROTOC ON)
+-else()
+-  set(protobuf_BUILD_LIBPROTOC OFF)
+ endif ()
+ # Path to main configure script
+ set(protobuf_CONFIGURE_SCRIPT "../configure.ac")
+diff --git a/cmake/install.cmake b/cmake/install.cmake
+index be47c54a1e..4091bc8af9 100644
+--- a/cmake/install.cmake
++++ b/cmake/install.cmake
+@@ -6,9 +6,9 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/protobuf-lite.pc.cmake
+                ${CMAKE_CURRENT_BINARY_DIR}/protobuf-lite.pc @ONLY)
+ 
+ set(_protobuf_libraries libprotobuf-lite libprotobuf)
+-if (protobuf_BUILD_PROTOC_BINARIES)
++if (protobuf_BUILD_LIBPROTOC)
+     list(APPEND _protobuf_libraries libprotoc)
+-endif (protobuf_BUILD_PROTOC_BINARIES)
++endif (protobuf_BUILD_LIBPROTOC)
+ 
+ foreach(_library ${_protobuf_libraries})
+   set_property(TARGET ${_library}
