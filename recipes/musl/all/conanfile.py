@@ -3,7 +3,6 @@ import stat
 from conans import ConanFile, tools, AutoToolsBuildEnvironment, CMake
 from conans.errors import ConanException
 
-
 class MuslConan(ConanFile):
     name = "musl"
     url = "https://github.com/conan-io/conan-center-index"
@@ -33,8 +32,12 @@ class MuslConan(ConanFile):
         pass
 
     def source(self):
+        linux_version = "4.19.176"
+        tools.get(**self.conan_data["sources-linux"][linux_version])
+        os.rename(f"linux-{linux_version}", "linux")
+
         musl_version = "1.2.2"
-        tools.get(**self.conan_data["source-musl"][self.version])
+        tools.get(**self.conan_data["sources-musl"][musl_version])
         os.rename(f"musl-{musl_version}", "musl")
 
         # TODO: if rtlib compiler-rt
@@ -50,7 +53,11 @@ class MuslConan(ConanFile):
         tools.get(**self.conan_data["sources-libcxx"][clang_version])
         os.rename(f"libcxx-{clang_version}.src", "libcxx")
 
-    # set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES ${CMAKE_SYSROOT}/include/c++/v1)
+    def _build_linux(self):
+        with tools.chdir("linux"):
+            autotools = AutoToolsBuildEnvironment(self)
+            # We only need the headers from linux so run the 'headers_install' target
+            autotools.make(target="headers_install", args=[f"INSTALL_HDR_PATH={self.package_folder}"])
 
     def _build_compiler_rt(self):
         # Tips and tricks from: https://llvm.org/docs/HowToCrossCompileBuiltinsOnArm.html
@@ -60,9 +67,18 @@ class MuslConan(ConanFile):
         cmake.definitions["CMAKE_ASM_COMPILER_TARGET"] = "armv7-linux-musleabihf"
         cmake.definitions["COMPILER_RT_DEFAULT_TARGET_ONLY"] = True
         cmake.definitions["CMAKE_TRY_COMPILE_TARGET_TYPE"] = "STATIC_LIBRARY"
-        cmake.configure(source_folder="compiler-rt/lib/builtins", build_folder="compiler-rt-builtins-bin")
+        cmake.definitions["COMPILER_RT_BUILD_SANITIZERS"] = False
+        cmake.definitions["COMPILER_RT_BUILD_XRAY"] = False
+        cmake.definitions["COMPILER_RT_BUILD_LIBFUZZER"] = False
+        cmake.definitions["COMPILER_RT_BUILD_PROFILE"] = False
+        cmake.configure(source_folder="compiler-rt", build_folder="compiler-rt-bin")
         cmake.build()
         cmake.install()
+
+        # TODO: Fix hard coded `armhf`, regex or similar
+        os.rename(f"{self.package_folder}/lib/linux/clang_rt.crtbegin-armhf.o", f"{self.package_folder}/lib/crtbeginS.o")
+        os.rename(f"{self.package_folder}/lib/linux/clang_rt.crtend-armhf.o", f"{self.package_folder}/lib/crtendS.o")
+        os.rename(f"{self.package_folder}/lib/linux/libclang_rt.builtins-armhf.a", f"{self.package_folder}/lib/libcompiler_rt.a")
 
     def _build_libunwind(self):
         cmake = CMake(self)
@@ -126,7 +142,8 @@ class MuslConan(ConanFile):
             autotools.flags.append(f"--target=armv7-linux-musleabihf -mfloat-abi=hard -march=armv7 -mfpu=neon")
             # TODO: Create function to calculate lib name (libclang_rt.builtins-armv7)
             # TODO: Only if compiler-rt
-            autotools.link_flags.append(f"-L{self.package_folder}/lib/linux/ -lclang_rt.builtins-armv7")
+            #autotools.link_flags.append(f"-L{self.package_folder}/lib/linux/ -lclang_rt.builtins-armv7")
+            autotools.link_flags.append(f"-L{self.package_folder}/lib/")
             # Even if we build shared we first need to build static libs,
             # then compiler-rt, then shared.
             autotools.configure(args=extra_args)
@@ -134,9 +151,9 @@ class MuslConan(ConanFile):
             autotools.install()
 
     def build(self):
+        self._build_linux()
         self._build_musl(shared=False)
         self._build_compiler_rt()
-        # We can skip this step based on option shared
         self._build_musl(shared=True)
         self._build_libunwind()
         self._build_libcxxabi()
