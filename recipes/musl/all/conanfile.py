@@ -25,6 +25,7 @@ class MuslConan(ConanFile):
     topics = ("libc", "libcxx", "musl", "clang")
 
     def config_options(self):
+        # TODO: Check options
         if self.settings.os == "Windows":
             del self.options.fPIC
 
@@ -32,6 +33,8 @@ class MuslConan(ConanFile):
         pass
 
     def source(self):
+        # TODO: Add version as options or seprate recipes
+
         linux_version = "4.19.176"
         tools.get(**self.conan_data["sources-linux"][linux_version])
         os.rename(f"linux-{linux_version}", "linux")
@@ -40,9 +43,7 @@ class MuslConan(ConanFile):
         tools.get(**self.conan_data["sources-musl"][musl_version])
         os.rename(f"musl-{musl_version}", "musl")
 
-        # TODO: if rtlib compiler-rt
-        # TODO: fetch version based on compiler version.
-        # TODO: separate recipe
+        # Clang stuff
         clang_version = "10.0.0"
         tools.get(**self.conan_data["sources-compiler-rt"][clang_version])
         os.rename(f"compiler-rt-{clang_version}.src", "compiler-rt")
@@ -53,11 +54,44 @@ class MuslConan(ConanFile):
         tools.get(**self.conan_data["sources-libcxx"][clang_version])
         os.rename(f"libcxx-{clang_version}.src", "libcxx")
 
+    def build(self):
+        # First install linux headers
+        self._build_linux()
+        # Then build static version of libc and install c header files
+        self._build_musl(shared=False)
+        # Then build the compiler runtime. Depends on c headers. After this we can link stuff.
+        self._build_compiler_rt()
+        # Then build dynamic libc. Depends on compiler_rt.
+        self._build_musl(shared=True)
+        # Now we can build libc++. Starting with libunwind -> libcxxabi -> libcxx.
+        self._build_libunwind()
+        self._build_libcxxabi()
+        self._build_libcxx()
+
     def _build_linux(self):
         with tools.chdir("linux"):
             autotools = AutoToolsBuildEnvironment(self)
             # We only need the headers from linux so run the 'headers_install' target
             autotools.make(target="headers_install", args=[f"INSTALL_HDR_PATH={self.package_folder}"])
+
+    def _build_musl(self, shared):
+        # TODO:
+        # LDFLAGS="-fuse-ld=lld"
+        # LIBCC="-lcompiler_rt
+        # Here instead of in profile
+        extra_args = []
+
+        if not shared:
+            extra_args.append("--disable-shared")
+
+        with tools.chdir("musl"):
+            autotools = AutoToolsBuildEnvironment(self)
+            # TODO: pick out stuff from settings
+            autotools.flags.append(f"--target=armv7-linux-musleabihf -mfloat-abi=hard -march=armv7 -mfpu=neon")
+            autotools.link_flags.append(f"-L{self.package_folder}/lib/")
+            autotools.configure(args=extra_args)
+            autotools.make()
+            autotools.install()
 
     def _build_compiler_rt(self):
         # Tips and tricks from: https://llvm.org/docs/HowToCrossCompileBuiltinsOnArm.html
@@ -67,6 +101,7 @@ class MuslConan(ConanFile):
         cmake.definitions["CMAKE_ASM_COMPILER_TARGET"] = "armv7-linux-musleabihf"
         cmake.definitions["COMPILER_RT_DEFAULT_TARGET_ONLY"] = True
         cmake.definitions["CMAKE_TRY_COMPILE_TARGET_TYPE"] = "STATIC_LIBRARY"
+        # TODO: Try to build sanitizers also
         cmake.definitions["COMPILER_RT_BUILD_SANITIZERS"] = False
         cmake.definitions["COMPILER_RT_BUILD_XRAY"] = False
         cmake.definitions["COMPILER_RT_BUILD_LIBFUZZER"] = False
@@ -127,37 +162,6 @@ class MuslConan(ConanFile):
         cmake.configure(source_folder="libcxx", build_folder="libcxx-bin")
         cmake.build()
         cmake.install()
-
-    def _build_musl(self, shared):
-        # TODO: Set LIBCC=" " based on self.options.rtlib
-
-        extra_args = []
-
-        if not shared:
-            extra_args.append("--disable-shared")
-
-        with tools.chdir("musl"):
-            autotools = AutoToolsBuildEnvironment(self)
-            # TODO: pick out stuff from settings
-            autotools.flags.append(f"--target=armv7-linux-musleabihf -mfloat-abi=hard -march=armv7 -mfpu=neon")
-            # TODO: Create function to calculate lib name (libclang_rt.builtins-armv7)
-            # TODO: Only if compiler-rt
-            #autotools.link_flags.append(f"-L{self.package_folder}/lib/linux/ -lclang_rt.builtins-armv7")
-            autotools.link_flags.append(f"-L{self.package_folder}/lib/")
-            # Even if we build shared we first need to build static libs,
-            # then compiler-rt, then shared.
-            autotools.configure(args=extra_args)
-            autotools.make()
-            autotools.install()
-
-    def build(self):
-        self._build_linux()
-        self._build_musl(shared=False)
-        self._build_compiler_rt()
-        self._build_musl(shared=True)
-        self._build_libunwind()
-        self._build_libcxxabi()
-        self._build_libcxx()
 
     def package(self):
         pass
