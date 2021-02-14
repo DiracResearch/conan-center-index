@@ -1,0 +1,53 @@
+
+
+cmake \
+ -GNinja \
+ -DCMAKE_C_COMPILER_TARGET=armv7l-linux-musleabihf \
+ -DCMAKE_CXX_COMPILER_TARGET=armv7l-linux-musleabihf \
+ -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+ -DCMAKE_C_COMPILER=/usr/bin/clang-10 \
+ -DCMAKE_CXX_COMPILER=/usr/bin/clang++-10 \
+ -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE=arm-linux-musleabihf \
+ -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
+ -DCOMPILER_RT_BUILD_XRAY=OFF \
+ -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+ -DCOMPILER_RT_BUILD_PROFILE=OFF \
+ -DCMAKE_INSTALL_PREFIX=install \
+ -DLLVM_PATH="$SOURCE_LLVM/llvm" \
+ -DCMAKE_BUILD_TYPE=Release \
+ ../compiler-rt-11.0.1.src
+
+
+set(CMAKE_SYSROOT $ENV{ROOT_BUILD_FOLDER}/output/$ENV{TARGET_TRIPLE}-target)
+
+
+
+cmake \
+ -GNinja \
+ -DCMAKE_SYSROOT=/home/anda/.conan/data/musl/1.2.2/dirac/testing/package/b33e7635f61b0087d07c9660d0f9861ffdf8e359 \
+ -DCMAKE_C_COMPILER_TARGET=arm-linux-musleabihf \
+ -DCMAKE_ASM_COMPILER_TARGET=arm-linux-musleabihf \
+ -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+ -DCMAKE_C_COMPILER=/usr/bin/clang-10 \
+ -DCOMPILER_RT_DEFAULT_TARGET_TRIPLE=arm-linux-musleabihf \
+ -DCMAKE_INSTALL_PREFIX=install \
+ -DCMAKE_BUILD_TYPE=Release \
+ ../compiler-rt-11.0.1.src/lib/builtins
+ 
+
+https://llvm.org/docs/HowToCrossCompileBuiltinsOnArm.html
+
+cmake \
+ -GNinja \
+ -DCMAKE_SYSROOT=/home/anda/.conan/data/musl/1.2.2/dirac/testing/package/b33e7635f61b0087d07c9660d0f9861ffdf8e359 \
+ -DCMAKE_C_COMPILER_TARGET=armv7-linux-musleabihf \
+ -DCMAKE_ASM_COMPILER_TARGET=armv7-linux-musleabihf \
+ -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+ -DCMAKE_C_COMPILER=/usr/bin/clang-10 \
+ -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
+ -DCMAKE_INSTALL_PREFIX=install \
+ -DCMAKE_BUILD_TYPE=Release \
+ ../compiler-rt-11.0.1.src/lib/builtins
+
+  -DCMAKE_C_FLAGS_INIT="-mfloat-abi=soft -march=armv7l -mfpu=neon" \
+ -DCMAKE_ASM_FLAGS_INIT="-mfloat-abi=soft -march=armv7l -mfpu=neon" \
