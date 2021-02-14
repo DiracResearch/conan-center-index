@@ -34,3 +34,4 @@ class MuslConan(ConanFile):
             autotools = AutoToolsBuildEnvironment(self)
             # We only need the headers from linux so run the 'headers_install' target
             autotools.make(target="headers_install", args=[f"INSTALL_HDR_PATH={self.package_folder}"])
+            # TODO: clean up .cmd files

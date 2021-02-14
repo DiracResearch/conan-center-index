@@ -18,7 +18,3 @@ sources-libcxx:
   10.0.0:
     url: https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.0/libcxx-10.0.0.src.tar.xz
     sha256: 270f8a3f176f1981b0f6ab8aa556720988872ec2b48ed3b605d0ced8d09156c7
-sources-linux:
-  4.19.176:
-    url: https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.19.176.tar.xz
-    sha256: e1c3b8d21ba31bd5c50bb3b2a741f62958eb2a116bf13fa0e14f1656c4826073

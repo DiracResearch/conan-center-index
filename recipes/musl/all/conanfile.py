@@ -21,8 +21,18 @@ class MuslConan(ConanFile):
         "fPIC": True,
         "rtlib": "compiler-rt"
     }
-
     topics = ("libc", "libcxx", "musl", "clang")
+    keep_imports = True
+
+    def imports(self):
+        # Copy linux headers to package folder. The package folder is used as
+        # the "sysroot"
+        self.copy("*.h", src="include", dst=f"{self.package_folder}/include")
+
+    def requirements(self):
+        # TODO: Expose linux version as an option?
+        #       Could make sense to have linux version in settings.yml?
+        self.requires.add(f"linux/4.19.176@dirac/testing2")
 
     def config_options(self):
         # TODO: Check options
@@ -34,11 +44,6 @@ class MuslConan(ConanFile):
 
     def source(self):
         # TODO: Add version as options or seprate recipes
-
-        linux_version = "4.19.176"
-        tools.get(**self.conan_data["sources-linux"][linux_version])
-        os.rename(f"linux-{linux_version}", "linux")
-
         musl_version = "1.2.2"
         tools.get(**self.conan_data["sources-musl"][musl_version])
         os.rename(f"musl-{musl_version}", "musl")
@@ -55,8 +60,9 @@ class MuslConan(ConanFile):
         os.rename(f"libcxx-{clang_version}.src", "libcxx")
 
     def build(self):
-        # First install linux headers
-        self._build_linux()
+        # The first step is to get the linux headers but that has already
+        # been taken care of by the requirement and import.
+
         # Then build static version of libc and install c header files
         self._build_musl(shared=False)
         # Then build the compiler runtime. Depends on c headers. After this we can link stuff.
@@ -67,12 +73,6 @@ class MuslConan(ConanFile):
         self._build_libunwind()
         self._build_libcxxabi()
         self._build_libcxx()
-
-    def _build_linux(self):
-        with tools.chdir("linux"):
-            autotools = AutoToolsBuildEnvironment(self)
-            # We only need the headers from linux so run the 'headers_install' target
-            autotools.make(target="headers_install", args=[f"INSTALL_HDR_PATH={self.package_folder}"])
 
     def _build_musl(self, shared):
         # TODO:
