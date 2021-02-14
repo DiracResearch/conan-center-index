@@ -23,8 +23,7 @@ class MuslConan(ConanFile):
         "rtlib": "compiler-rt"
     }
 
-    _source_subfolder = "source_subfolder"
-    topics = ("libc")
+    topics = ("libc", "libcxx", "musl", "clang")
 
     def config_options(self):
         if self.settings.os == "Windows":
@@ -34,8 +33,9 @@ class MuslConan(ConanFile):
         pass
 
     def source(self):
-        tools.get(**self.conan_data["sources"][self.version])
-        os.rename("{}-{}".format(self.name, self.version), self._source_subfolder)
+        musl_version = "1.2.2"
+        tools.get(**self.conan_data["source-musl"][self.version])
+        os.rename(f"musl-{musl_version}", "musl")
 
         # TODO: if rtlib compiler-rt
         # TODO: fetch version based on compiler version.
@@ -43,6 +43,14 @@ class MuslConan(ConanFile):
         clang_version = "10.0.0"
         tools.get(**self.conan_data["sources-compiler-rt"][clang_version])
         os.rename(f"compiler-rt-{clang_version}.src", "compiler-rt")
+        tools.get(**self.conan_data["sources-libunwind"][clang_version])
+        os.rename(f"libunwind-{clang_version}.src", "libunwind")
+        tools.get(**self.conan_data["sources-libcxxabi"][clang_version])
+        os.rename(f"libcxxabi-{clang_version}.src", "libcxxabi")
+        tools.get(**self.conan_data["sources-libcxx"][clang_version])
+        os.rename(f"libcxx-{clang_version}.src", "libcxx")
+
+    # set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES ${CMAKE_SYSROOT}/include/c++/v1)
 
     def _build_compiler_rt(self):
         # Tips and tricks from: https://llvm.org/docs/HowToCrossCompileBuiltinsOnArm.html
@@ -56,6 +64,54 @@ class MuslConan(ConanFile):
         cmake.build()
         cmake.install()
 
+    def _build_libunwind(self):
+        cmake = CMake(self)
+        cmake.definitions["CMAKE_SYSROOT"] = self.package_folder
+        cmake.definitions["CMAKE_C_COMPILER_TARGET"] = "armv7-linux-musleabihf"
+        cmake.definitions["CMAKE_CXX_COMPILER_TARGET"] = "armv7-linux-musleabihf"
+        cmake.definitions["CMAKE_ASM_COMPILER_TARGET"] = "armv7-linux-musleabihf"
+        cmake.definitions["CMAKE_TRY_COMPILE_TARGET_TYPE"] = "STATIC_LIBRARY"
+        cmake.definitions["LIBUNWIND_ENABLE_SHARED"] = False
+        cmake.definitions["LLVM_ENABLE_LIBCXX"] = True
+        cmake.configure(source_folder="libunwind", build_folder="libunwind-bin")
+        cmake.build()
+        cmake.install()
+
+    def _build_libcxxabi(self):
+        cmake = CMake(self)
+        cmake.definitions["CMAKE_SYSROOT"] = self.package_folder
+        cmake.definitions["CMAKE_C_COMPILER_TARGET"] = "armv7-linux-musleabihf"
+        cmake.definitions["CMAKE_CXX_COMPILER_TARGET"] = "armv7-linux-musleabihf"
+        cmake.definitions["CMAKE_ASM_COMPILER_TARGET"] = "armv7-linux-musleabihf"
+        cmake.definitions["CMAKE_TRY_COMPILE_TARGET_TYPE"] = "STATIC_LIBRARY"
+        cmake.definitions["LIBCXXABI_TARGET_TRIPLE"] = "armv7-linux-musleabihf"
+        cmake.definitions["LIBCXXABI_USE_LLVM_UNWINDER"] = True
+        cmake.definitions["LIBCXXABI_USE_COMPILER_RT"] = True
+        cmake.definitions["LIBCXXABI_LIBCXX_INCLUDES"] = f"{self.build_folder}/libcxx/include"
+        cmake.configure(source_folder="libcxxabi", build_folder="libcxxabi-bin")
+        cmake.build()
+        cmake.install()
+
+    def _build_libcxx(self):
+        cmake = CMake(self)
+        cmake.definitions["CMAKE_SYSROOT"] = self.package_folder
+        cmake.definitions["CMAKE_C_COMPILER_TARGET"] = "armv7-linux-musleabihf"
+        cmake.definitions["CMAKE_CXX_COMPILER_TARGET"] = "armv7-linux-musleabihf"
+        cmake.definitions["CMAKE_ASM_COMPILER_TARGET"] = "armv7-linux-musleabihf"
+        cmake.definitions["CMAKE_TRY_COMPILE_TARGET_TYPE"] = "STATIC_LIBRARY"
+
+        cmake.definitions["LIBCXX_HAS_MUSL_LIBC"] = True
+        cmake.definitions["LIBCXX_HAS_GCC_S_LIB"] = False
+        cmake.definitions["LIBCXX_CXX_ABI"] = "libcxxabi"
+        cmake.definitions["LIBCXX_USE_COMPILER_RT"] = True
+        cmake.definitions["LIBCXXABI_USE_LLVM_UNWINDER"] = True
+        cmake.definitions["LIBCXX_CXX_ABI_INCLUDE_PATHS"] = f"{self.build_folder}/libcxxabi/include"
+        cmake.definitions["LIBCXX_CXX_ABI_LIBRARY_PATH"] = f"{self.package_folder}/lib"
+
+        cmake.configure(source_folder="libcxx", build_folder="libcxx-bin")
+        cmake.build()
+        cmake.install()
+
     def _build_musl(self, shared):
         # TODO: Set LIBCC=" " based on self.options.rtlib
 
@@ -64,7 +120,7 @@ class MuslConan(ConanFile):
         if not shared:
             extra_args.append("--disable-shared")
 
-        with tools.chdir(self._source_subfolder):
+        with tools.chdir("musl"):
             autotools = AutoToolsBuildEnvironment(self)
             # TODO: pick out stuff from settings
             autotools.flags.append(f"--target=armv7-linux-musleabihf -mfloat-abi=hard -march=armv7 -mfpu=neon")
@@ -82,6 +138,9 @@ class MuslConan(ConanFile):
         self._build_compiler_rt()
         # We can skip this step based on option shared
         self._build_musl(shared=True)
+        self._build_libunwind()
+        self._build_libcxxabi()
+        self._build_libcxx()
 
     def package(self):
         pass
