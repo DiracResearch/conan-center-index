@@ -17,8 +17,20 @@ class ProtobufConan(ConanFile):
     generators = "cmake"
     short_paths = True
     settings = "os", "arch", "compiler", "build_type"
-    options = {"shared": [True, False], "with_zlib": [True, False], "fPIC": [True, False], "lite": [True, False]}
-    default_options = {"with_zlib": False, "shared": False, "fPIC": True, "lite": False}
+    options = {
+        "shared": [True, False],
+        "with_zlib": [True, False],
+        "fPIC": [True, False],
+        "lite": [True, False],
+        "tools": [True, False]
+    }
+    default_options = {
+        "with_zlib": False,
+        "shared": False,
+        "fPIC": True,
+        "lite": False,
+        "tools": True,
+    }
 
     _cmake = None
 
@@ -72,8 +84,8 @@ class ProtobufConan(ConanFile):
             self._cmake.definitions["CMAKE_INSTALL_CMAKEDIR"] = self._cmake_install_base_path.replace("\\", "/")
             self._cmake.definitions["protobuf_WITH_ZLIB"] = self.options.with_zlib
             self._cmake.definitions["protobuf_BUILD_TESTS"] = False
-            self._cmake.definitions["protobuf_BUILD_PROTOC_BINARIES"] = not tools.cross_building(self.settings)
-            self._cmake.definitions["protobuf_BUILD_LIBPROTOC"] = True
+            self._cmake.definitions["protobuf_BUILD_PROTOC_BINARIES"] = True
+            self._cmake.definitions["protobuf_BUILD_LIBPROTOC"] = self.options.tools
             if self.settings.compiler == "Visual Studio":
                 self._cmake.definitions["protobuf_MSVC_STATIC_RUNTIME"] = "MT" in str(self.settings.compiler.runtime)
             self._cmake.configure(build_folder=self._build_subfolder)
@@ -198,7 +210,7 @@ if(DEFINED Protobuf_SRC_ROOT_FOLDER)""",
         self.cpp_info.components["libprotoc"].libs = [lib_prefix + "protoc" + lib_suffix]
         self.cpp_info.components["libprotoc"].requires = ["libprotobuf"]
 
-        if not tools.cross_building(self.settings):
+        if self.options.tools and not tools.cross_building(self.settings):
             self.cpp_info.components["protoc"].name = "protoc"
             self.cpp_info.components["protoc"].requires.extend(["libprotoc", "libprotobuf"])
 

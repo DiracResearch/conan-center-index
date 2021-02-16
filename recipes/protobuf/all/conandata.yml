@@ -22,3 +22,7 @@ patches:
       base_path: "source_subfolder"
     - patch_file: "patches/upstream-issue-7949-build-libprotoc-separately.patch"
       base_path: "source_subfolder"
+    - patch_file: "patches/upstream-pr-7288-android-log.patch"
+      base_path: "source_subfolder"
+    - patch_file: "patches/bundle-destination.patch"
+      base_path: "source_subfolder"
