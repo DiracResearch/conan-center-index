@@ -114,6 +114,7 @@ class MuslConan(ConanFile):
         os.rename(f"{self.package_folder}/lib/linux/clang_rt.crtbegin-armhf.o", f"{self.package_folder}/lib/crtbeginS.o")
         os.rename(f"{self.package_folder}/lib/linux/clang_rt.crtend-armhf.o", f"{self.package_folder}/lib/crtendS.o")
         os.rename(f"{self.package_folder}/lib/linux/libclang_rt.builtins-armhf.a", f"{self.package_folder}/lib/libcompiler_rt.a")
+        # TODO: Remove folder f"{self.package_folder}/lib/linux". Check if empty first?
 
     def _build_libunwind(self):
         cmake = CMake(self)
