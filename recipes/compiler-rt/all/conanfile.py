@@ -32,7 +32,7 @@ class CompilerRtConan(ConanFile):
         return "build_subfolder"
 
     def requirements(self):
-        # TODO: if musl
+        # TODO: if option musl
         self.requires.add(f"musl-headers/1.2.2@dirac/testing")
 
     def config_options(self):
