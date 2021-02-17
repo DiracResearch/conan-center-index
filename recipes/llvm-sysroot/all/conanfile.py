@@ -25,6 +25,11 @@ class LlvmSysrootConan(ConanFile):
         abi = 'musleabihf' # TODO: base on settings
         return f"{arch}-linux-{abi}"
 
+        # Info on triplets
+        # https://llvm.org/doxygen/Triple_8h_source.html
+        # https://docs.conan.io/en/latest/reference/config_files/settings.yml.html#architectures
+        # https://github.com/richfelker/musl-cross-make/blob/master/README.md#supported-targets
+
     def build_requirements(self):
         self.build_requires("musl/1.2.2@dirac/testing", force_host_context=True)
         self.build_requires(f"libcxx/{self.version}@dirac/testing", force_host_context=True)
