@@ -22,11 +22,18 @@ class MuslConan(ConanFile):
         "rtlib": "compiler-rt"
     }
     topics = ("libc", "libcxx", "musl", "clang")
+    keep_imports = True
 
     def requirements(self):
         # TODO: if option compiler-rt
         # TODO: use clang version info
         self.requires.add(f"compiler-rt/10.0.0@dirac/testing")
+
+    def imports(self):
+        # TODO: if compiler-rt
+        # We need the libraries and object files from compile-rt to create a
+        # temporary "sysroot" to build the rest of the sysroot (cxx for example)
+        self.copy("*", src="lib", dst=f"{self.package_folder}/lib")
 
     def config_options(self):
         # TODO: Check options

@@ -1,7 +1,7 @@
 # llvm-musl-cross
 
 
-conan create all musl-headers/1.2.2@dirac/testing2 --build=musl-headers --profile ../../test-arm-profile.txt
+conan create all musl-headers/1.2.2@dirac/testing --build=musl-headers --profile ../../test-arm-profile.txt
 
 https://musl.cc/
 http://ellcc.org/
