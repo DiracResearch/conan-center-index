@@ -55,11 +55,12 @@ class MuslConan(ConanFile):
         os.rename(f"{self.name}-{self.version}", self.name)
 
     def build(self):
-        with tools.chdir(self.name):
+        with tools.chdir(self.name), \
+             tools.environment_append({"LIBCC": "-lcompiler_rt"}):
             autotools = AutoToolsBuildEnvironment(self)
             # TODO: pick out stuff from settings
             autotools.flags.append(f"--target=armv7-linux-musleabihf -mfloat-abi=hard -march=armv7 -mfpu=neon")
-            #autotools.link_flags.append(f"-L{self.package_folder}/lib/")
+            autotools.link_flags.append(f"-fuse-ld=lld")
             autotools.configure()
             autotools.make()
             autotools.install()
