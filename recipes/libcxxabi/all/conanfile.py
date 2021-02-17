@@ -46,9 +46,9 @@ class ClangLibcxxabiConan(ConanFile):
 
     def build(self):
         # TODO: if unwinder
-        # We need to handle the dependenices and flags more "manual" because
+        # We need to handle the dependencies and flags more "manual" because
         # building this libs is a bit different from the normal stuff.
-        with tools.environment_append({"LDFLAGS": f"{os.getenv('LDFLAGS')} -L{self.deps_cpp_info['libunwind-llvm'].rootpath}/lib"}):
+        with tools.environment_append({"LDFLAGS": f"-fuse-ld=lld -L{self.deps_cpp_info['libunwind-llvm'].rootpath}/lib"}):
             cmake = CMake(self)
             cmake.definitions["CMAKE_SYSROOT"] = self.deps_cpp_info["musl"].rootpath
             cmake.definitions["CMAKE_C_COMPILER_TARGET"] = "armv7-linux-musleabihf"
