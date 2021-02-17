@@ -38,20 +38,21 @@ class ClangUnwindConan(ConanFile):
         os.rename(f"libunwind-{self.version}.src", self.name)
 
     def build(self):
-        cmake = CMake(self)
-        # TODO: if musl
-        cmake.definitions["CMAKE_SYSROOT"] =  self.deps_cpp_info["musl"].rootpath
-        cmake.definitions["CMAKE_C_COMPILER_TARGET"] = "armv7-linux-musleabihf"
-        cmake.definitions["CMAKE_CXX_COMPILER_TARGET"] = "armv7-linux-musleabihf"
-        cmake.definitions["CMAKE_ASM_COMPILER_TARGET"] = "armv7-linux-musleabihf"
-        cmake.definitions["CMAKE_TRY_COMPILE_TARGET_TYPE"] = "STATIC_LIBRARY"
-        # TODO: if musl uses complier-rt
-        cmake.definitions["LIBUNWIND_USE_COMPILER_RT"] = True
-        cmake.definitions["LLVM_ENABLE_LIBCXX"] = True
+        with tools.environment_append({"LDFLAGS": "-fuse-ld=lld"}):
+            cmake = CMake(self)
+            # TODO: if musl
+            cmake.definitions["CMAKE_SYSROOT"] =  self.deps_cpp_info["musl"].rootpath
+            cmake.definitions["CMAKE_C_COMPILER_TARGET"] = "armv7-linux-musleabihf"
+            cmake.definitions["CMAKE_CXX_COMPILER_TARGET"] = "armv7-linux-musleabihf"
+            cmake.definitions["CMAKE_ASM_COMPILER_TARGET"] = "armv7-linux-musleabihf"
+            cmake.definitions["CMAKE_TRY_COMPILE_TARGET_TYPE"] = "STATIC_LIBRARY"
+            # TODO: if musl uses complier-rt
+            cmake.definitions["LIBUNWIND_USE_COMPILER_RT"] = True
+            cmake.definitions["LLVM_ENABLE_LIBCXX"] = True
 
-        cmake.configure(source_folder=self.name, build_folder=f"{self.name}-bin")
-        cmake.build()
-        cmake.install()
+            cmake.configure(source_folder=self.name, build_folder=f"{self.name}-bin")
+            cmake.build()
+            cmake.install()
 
     def package(self):
         pass
