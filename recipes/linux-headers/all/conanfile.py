@@ -4,7 +4,7 @@ from conans import ConanFile, tools, AutoToolsBuildEnvironment
 from conans.errors import ConanException
 
 class MuslConan(ConanFile):
-    name = "linux"
+    name = "linux-headers"
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "https://www.kernel.org/"
     license = "GPL"
@@ -30,7 +30,7 @@ class MuslConan(ConanFile):
         tools.get(**self.conan_data["sources"][self.version])
 
     def build(self):
-        with tools.chdir(f"{self.source_folder}/{self.name}-{self.version}"):
+        with tools.chdir(f"{self.source_folder}/linux-{self.version}"):
             autotools = AutoToolsBuildEnvironment(self)
             # We only need the headers from linux so run the 'headers_install' target
             autotools.make(target="headers_install", args=[f"INSTALL_HDR_PATH={self.package_folder}"])
