@@ -29,11 +29,18 @@ class MuslConan(ConanFile):
         # TODO: use clang version info
         self.requires.add(f"compiler-rt/10.0.0@dirac/testing")
 
+        # TODO: should probably be a "build requires" with host context
+        self.requires.add(f"linux-headers/4.19.176@dirac/testing")
+
     def imports(self):
         # TODO: if compiler-rt
         # We need the libraries and object files from compile-rt to create a
         # temporary "sysroot" to build the rest of the sysroot (cxx for example)
         self.copy("*", src="lib", dst=f"{self.package_folder}/lib")
+
+        # Copy linux headers to package folder. The package folder is used as
+        # the "sysroot"
+        self.copy("*.h", src="include", dst=f"{self.package_folder}/include")
 
     def config_options(self):
         # TODO: Check options
