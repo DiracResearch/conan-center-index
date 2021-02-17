@@ -67,7 +67,8 @@ class ClangLibcxxabiConan(ConanFile):
             cmake.install()
 
     def package(self):
-        pass
+        # Headers not installed by CMake, copy manually
+        self.copy(pattern="*.h", dst="include", src=f"{self.name}/include")
 
     def package_info(self):
         pass
