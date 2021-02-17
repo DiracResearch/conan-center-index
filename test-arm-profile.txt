@@ -12,5 +12,3 @@ CC=/usr/bin/clang-10
 CXX=/usr/bin/clang++-10
 AR=/usr/bin/llvm-ar-10
 RANLIB=/usr/bin/llvm-ranlib-10
-LDFLAGS="-fuse-ld=lld"
-LIBCC="-lcompiler_rt"
