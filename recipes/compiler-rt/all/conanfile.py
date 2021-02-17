@@ -9,8 +9,6 @@ class CompilerRtConan(ConanFile):
     homepage = "https://compiler-rt.llvm.org/"
     license = "MIT"
     description = ("todo")
-    generators = "cmake"
-    exports_sources = ["CMakeLists.txt"]
     settings = "os", "arch", "compiler", "build_type"
     # TODO: option libc, musl or glibc
     options = {
@@ -23,14 +21,6 @@ class CompilerRtConan(ConanFile):
     }
     topics = ("compiler-rt", "clang")
 
-    @property
-    def _source_subfolder(self):
-        return "source_subfolder"
-
-    @property
-    def _build_subfolder(self):
-        return "build_subfolder"
-
     def requirements(self):
         # TODO: if option musl
         self.requires.add(f"musl-headers/1.2.2@dirac/testing")
@@ -40,22 +30,20 @@ class CompilerRtConan(ConanFile):
         if self.settings.os == "Windows":
             del self.options.fPIC
 
-
     def configure(self):
         pass
 
     def source(self):
         tools.get(**self.conan_data["sources"][self.version])
-        os.rename(f"{self.name}-{self.version}.src", self._source_subfolder)
+        os.rename(f"{self.name}-{self.version}.src", self.name)
 
     def build(self):
         # Tips and tricks from: https://llvm.org/docs/HowToCrossCompileBuiltinsOnArm.html
         cmake = CMake(self)
 
         # TODO: if musl
-        # When we are building compiler-rt we don't have a complete sysroot at this point
-        # Just add a dummy to make sure any system headers are not used.
-        cmake.definitions["CMAKE_SYSROOT"] = "dummy"
+        # We use the musl headers as our, temporary, small sysroot
+        cmake.definitions["CMAKE_SYSROOT"] =  self.deps_cpp_info["musl-headers"].rootpath
 
         cmake.definitions["CMAKE_C_COMPILER_TARGET"] = "armv7-linux-musleabihf"
         cmake.definitions["CMAKE_ASM_COMPILER_TARGET"] = "armv7-linux-musleabihf"
@@ -66,7 +54,7 @@ class CompilerRtConan(ConanFile):
         cmake.definitions["COMPILER_RT_BUILD_XRAY"] = False
         cmake.definitions["COMPILER_RT_BUILD_LIBFUZZER"] = False
         cmake.definitions["COMPILER_RT_BUILD_PROFILE"] = False
-        cmake.configure(build_folder=self._build_subfolder)
+        cmake.configure(source_folder=self.name, build_folder="compiler-rt-bin")
         cmake.build()
         cmake.install()
 
