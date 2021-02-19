@@ -1,7 +1,7 @@
 import os
-import stat
-from conans import ConanFile, tools, AutoToolsBuildEnvironment, CMake
-from conans.errors import ConanException
+from conans import ConanFile, tools
+from conans.errors import ConanException, ConanInvalidConfiguration
+
 
 class MuslConan(ConanFile):
     name = "musl"
@@ -12,17 +12,35 @@ class MuslConan(ConanFile):
                    "correct in the sense of standards-conformance and safety.")
     settings = "os", "arch", "compiler", "build_type"
     options = {
+        "target": "ANY",
         "shared": [True, False],
         "fPIC": [True, False],
         "rtlib": ["compiler-rt", "libgcc"]
     }
     default_options = {
+        "target": None,
         "shared": False,
         "fPIC": True,
         "rtlib": "compiler-rt"
     }
     topics = ("libc", "libcxx", "musl", "clang")
     keep_imports = True
+
+    @property
+    def _llvm_triplet(self):
+        arch = self.settings_target.arch  # Translate names?
+        abi = 'musleabihf'  # TODO: base on settings
+        return f"{arch}-linux-{abi}"
+
+    def configure(self):
+        settings_target = getattr(self, 'settings_target', None)
+        if settings_target is None:
+            # It is running in 'host', so Conan is compiling this package
+            if not self.options.target:
+                raise ConanInvalidConfiguration(
+                    "A value for option 'target' has to be provided")
+        else:
+            self.options.target = self._llvm_triplet
 
     def requirements(self):
         # TODO: if option compiler-rt
@@ -47,23 +65,21 @@ class MuslConan(ConanFile):
         if self.settings.os == "Windows":
             del self.options.fPIC
 
-    def configure(self):
-        pass
-
     def source(self):
         tools.get(**self.conan_data["sources"][self.version])
         os.rename(f"{self.name}-{self.version}", self.name)
 
     def build(self):
+        # Never got it to work with AutoToolsBuildEnvironment.
+        # Trick to get the correct logic when settings_target is needed...
         with tools.chdir(self.name), \
-             tools.environment_append({"LIBCC": "-lcompiler_rt"}):
-            autotools = AutoToolsBuildEnvironment(self)
-            # TODO: pick out stuff from settings
-            autotools.flags.append(f"--target=armv7-linux-musleabihf -mfloat-abi=hard -march=armv7 -mfpu=neon")
-            autotools.link_flags.append(f"-fuse-ld=lld")
-            autotools.configure()
-            autotools.make()
-            autotools.install()
+                tools.environment_append({"LIBCC": "-lcompiler_rt"}), \
+                tools.environment_append({"CFLAGS": f"--target={self.options.target}"}), \
+                tools.environment_append({"LDFLAGS": f"-fuse-ld=lld -L{self.deps_cpp_info['compiler-rt'].rootpath}/lib"}):
+            self.run(
+                f"./configure --target={self.options.target} --prefix={self.package_folder}")
+            self.run("make")
+            self.run("make install")
 
     def package(self):
         pass
