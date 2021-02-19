@@ -4,8 +4,7 @@ import os
 
 class LlvmSysrootConan(ConanFile):
     name = "llvm-sysroot"
-    description = "The Android NDK is a toolset that lets you implement parts of your app in " \
-                  "native code, using languages such as C and C++"
+    description = "todo"
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "https://llvm.org/"
     topics = ("llvm", "clang", "toolchain", "sysroot", "cross compile")
@@ -76,6 +75,9 @@ class LlvmSysrootConan(ConanFile):
         self.output.info('Creating CHOST environment variable: %s' % self._llvm_triplet)
         self.env_info.CHOST = self._llvm_triplet
 
+        self.env_info.CFLAGS = f"-target {self._llvm_triplet} --sysroot={sysroot}"
+        self.env_info.CXXFLAGS = f"-target {self._llvm_triplet} --sysroot={sysroot} -I{sysroot}/include/c++/v1"
+
         # TODO: static should be and option. Or left up to the consumer?
         # TODO: Distinguish between ldflags for c and c++?
         # TODO: Escape paths? Use ""?
@@ -85,7 +87,6 @@ class LlvmSysrootConan(ConanFile):
                                 f"{sysroot}/lib/crtendS.o "\
                                 f"{sysroot}/lib/crtn.o "\
                                 "-static"
-        self.env_info.CXXFLAGS = f"-I{sysroot}/include/c++/v1"
 
         # TODO: Set CC/LD/AR/RANLIB here or is it up to the profile to decide?
         # TODO: Test with auto tools
