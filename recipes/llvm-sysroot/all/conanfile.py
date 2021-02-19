@@ -9,7 +9,6 @@ class LlvmSysrootConan(ConanFile):
     homepage = "https://llvm.org/"
     topics = ("llvm", "clang", "toolchain", "sysroot", "cross compile")
     license = "Apache-2.0"
-    exports_sources = ["cmake/llvm-toolchain.cmake"]
     settings = "os", "arch", "compiler", "build_type"
     keep_imports = True
 
@@ -57,7 +56,7 @@ class LlvmSysrootConan(ConanFile):
         pass
 
     def package(self):
-        self.copy("*", src="cmake", dst=f"{self.package_folder}/cmake")
+        pass
 
     def package_id(self):
         self.info.requires.clear()
@@ -66,8 +65,6 @@ class LlvmSysrootConan(ConanFile):
     def package_info(self):
         sysroot = self.package_folder
 
-        self.output.info(f"Creating CONAN_CMAKE_SYSROOT environment variable: {sysroot}")
-        self.env_info.CONAN_CMAKE_SYSROOT = sysroot
         self.output.info(f"Creating SYSROOT environment variable: {sysroot}")
         self.env_info.SYSROOT = sysroot
         self.output.info(f"Creating self.cpp_info.sysroot: {sysroot}")
@@ -94,6 +91,3 @@ class LlvmSysrootConan(ConanFile):
 
         # TODO: Might have to do RPATH things
 
-        toolchain = os.path.join(self.package_folder, "cmake", "llvm-toolchain.cmake")
-        self.output.info('Creating CONAN_CMAKE_TOOLCHAIN_FILE environment variable: %s' % toolchain)
-        self.env_info.CONAN_CMAKE_TOOLCHAIN_FILE = toolchain
