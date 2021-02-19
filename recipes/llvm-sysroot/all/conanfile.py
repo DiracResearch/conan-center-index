@@ -14,34 +14,42 @@ class LlvmSysrootConan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
     keep_imports = True
 
-    options = {"libc": ["musl"]}
-    default_options = {"libc": "musl"}
+    options = {
+        "target": "ANY",
+        "libc": ["musl/1.2.2"]
+    }
+    default_options = {
+        "target": None,
+        "libc": "musl/1.2.2"
+    }
 
     # TODO: Check flags and options and make sure they are sane
 
     @property
     def _llvm_triplet(self):
-        arch = self.settings.arch # TODO: settings_target? Translate names?
-        abi = 'musleabihf' # TODO: base on settings
+        arch = self.settings_target.arch  # Translate names?
+        abi = 'musleabihf'  # TODO: base on options/settings
         return f"{arch}-linux-{abi}"
 
-        # Info on triplets
-        # https://llvm.org/doxygen/Triple_8h_source.html
-        # https://docs.conan.io/en/latest/reference/config_files/settings.yml.html#architectures
-        # https://github.com/richfelker/musl-cross-make/blob/master/README.md#supported-targets
+    def configure(self):
+        settings_target = getattr(self, 'settings_target', None)
+        if settings_target is None:
+            # It is running in 'host', so Conan is compiling this package
+            if not self.options.target:
+                raise ConanInvalidConfiguration(
+                    "A value for option 'target' has to be provided")
+        else:
+            self.options.target = self._llvm_triplet
 
-    def build_requirements(self):
-        self.build_requires("musl/1.2.2@dirac/testing", force_host_context=True)
-        self.build_requires(f"libcxx/{self.version}@dirac/testing", force_host_context=True)
+    def requirements(self):
+        self.requires(f"{self.options.libc}@dirac/testing")
+        self.requires(f"libcxx/{self.version}@dirac/testing")
 
     def imports(self):
         # Repackage the sysroot for consumption
         self.copy("*", src="lib", dst=f"{self.package_folder}/lib")
         self.copy("*", src="include", dst=f"{self.package_folder}/include")
         self.copy("*", src="bin", dst=f"{self.package_folder}/bin")
-
-    def configure(self):
-        pass
 
     def source(self):
         pass
@@ -51,6 +59,10 @@ class LlvmSysrootConan(ConanFile):
 
     def package(self):
         self.copy("*", src="cmake", dst=f"{self.package_folder}/cmake")
+
+    def package_id(self):
+        self.info.requires.clear()
+        self.info.settings.clear()
 
     def package_info(self):
         sysroot = self.package_folder
