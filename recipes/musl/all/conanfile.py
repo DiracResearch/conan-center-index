@@ -74,7 +74,7 @@ class MuslConan(ConanFile):
         # Trick to get the correct logic when settings_target is needed...
         with tools.chdir(self.name), \
                 tools.environment_append({"LIBCC": "-lcompiler_rt"}), \
-                tools.environment_append({"CFLAGS": f"--target={self.options.target}"}), \
+                tools.environment_append({"CFLAGS": f"-target={self.options.target}"}), \
                 tools.environment_append({"LDFLAGS": f"-fuse-ld=lld -L{self.deps_cpp_info['compiler-rt'].rootpath}/lib"}):
             self.run(
                 f"./configure --target={self.options.target} --prefix={self.package_folder}")
