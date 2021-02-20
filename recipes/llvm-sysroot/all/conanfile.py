@@ -12,35 +12,51 @@ class LlvmSysrootConan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
     keep_imports = True
 
-    options = {
-        "target": "ANY",
-        "libc": ["musl/1.2.2"]
-    }
-    default_options = {
-        "target": None,
-        "libc": "musl/1.2.2"
-    }
-
     # TODO: Check flags and options and make sure they are sane
 
     @property
-    def _llvm_triplet(self):
-        arch = self.settings_target.arch  # Translate names?
-        abi = 'musleabihf'  # TODO: base on options/settings
-        return f"{arch}-linux-{abi}"
-
-    def configure(self):
+    def _host_settings(self):
         settings_target = getattr(self, 'settings_target', None)
         if settings_target is None:
-            # It is running in 'host', so Conan is compiling this package
-            if not self.options.target:
-                raise ConanInvalidConfiguration(
-                    "A value for option 'target' has to be provided")
-        else:
-            self.options.target = self._llvm_triplet
+            settings_target = self.settings
+        return settings_target
+
+    @property
+    def _conan_arch(self):
+        settings_target = getattr(self, 'settings_target', None)
+        if settings_target is None:
+            settings_target = self.settings
+        return settings_target.arch
+
+    @property
+    def _musl_abi(self):
+        # Translate arch to musl abi
+        abi = {"armv6": "musleabi",
+               "armv7": "musleabi",
+               "armv7hf": "musleabihf"}.get(str(self._conan_arch))
+        # Default to just "musl"
+        if abi == None:
+            abi = "musl"
+
+        return abi
+
+    @property
+    def _musl_arch(self):
+        # Translate conan arch to musl/clang arch
+        arch = {"armv8": "aarch64"}.get(str(self._conan_arch))
+        # Default to a one-to-one mapping
+        if arch == None:
+            arch = self._conan_arch
+        return arch
+
+    @property
+    def _triplet(self):
+        return "{}-linux-{}".format(self._musl_arch, self._musl_abi)
 
     def requirements(self):
-        self.requires(f"{self.options.libc}@dirac/testing")
+        self.requires(f"musl-headers/1.2.2@dirac/testing", override=True)
+        self.requires(f"musl-headers/1.2.2@dirac/testing", override=True)
+        self.requires(f"compiler-rt/{self.version}@dirac/testing", override=True)
         self.requires(f"libcxx/{self.version}@dirac/testing")
 
     def imports(self):
@@ -48,6 +64,7 @@ class LlvmSysrootConan(ConanFile):
         self.copy("*", src="lib", dst=f"{self.package_folder}/lib")
         self.copy("*", src="include", dst=f"{self.package_folder}/include")
         self.copy("*", src="bin", dst=f"{self.package_folder}/bin")
+        self.copy("*", src="licenses", dst=f"{self.package_folder}/licenses")
 
     def source(self):
         pass
@@ -59,8 +76,18 @@ class LlvmSysrootConan(ConanFile):
         pass
 
     def package_id(self):
-        self.info.requires.clear()
+        # Copy settings from host env.
+        # Need to do this to be able to have llvm-sysroot in "build_requires" in the profile
+        # Could probably be solved if it was possible to express "force_host_context"
+        # under [build_requires] in the profile.
         self.info.settings.clear()
+        self.info.settings.compiler = self._host_settings.compiler
+        self.info.settings.compiler.version = self._host_settings.compiler.version
+        self.info.settings.compiler.libc = self._host_settings.compiler.libc
+        self.info.settings.compiler.libcxx = self._host_settings.compiler.libcxx
+        self.info.settings.build_type = self._host_settings.build_type
+        self.info.settings.os = self._host_settings.os
+        self.info.settings.arch = self._host_settings.arch
 
     def package_info(self):
         sysroot = self.package_folder
@@ -69,11 +96,11 @@ class LlvmSysrootConan(ConanFile):
         self.env_info.SYSROOT = sysroot
         self.output.info(f"Creating self.cpp_info.sysroot: {sysroot}")
         self.cpp_info.sysroot = sysroot
-        self.output.info('Creating CHOST environment variable: %s' % self._llvm_triplet)
-        self.env_info.CHOST = self._llvm_triplet
+        self.output.info('Creating CHOST environment variable: %s' % self._triplet)
+        self.env_info.CHOST = self._triplet
 
-        self.env_info.CFLAGS = f"-target {self._llvm_triplet} --sysroot={sysroot}"
-        self.env_info.CXXFLAGS = f"-target {self._llvm_triplet} --sysroot={sysroot} -I{sysroot}/include/c++/v1"
+        self.env_info.CFLAGS = f"-target {self._triplet} --sysroot={sysroot}"
+        self.env_info.CXXFLAGS = f"-target {self._triplet} --sysroot={sysroot} -I{sysroot}/include/c++/v1"
 
         # TODO: static should be and option. Or left up to the consumer?
         # TODO: Distinguish between ldflags for c and c++?
