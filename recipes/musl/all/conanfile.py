@@ -39,7 +39,7 @@ class MuslConan(ConanFile):
     @property
     def _musl_abi(self):
         # Translate arch to musl abi
-        abi = {"armv6": "musleabi",
+        abi = {"armv6": "musleabihf",
                "armv7": "musleabi",
                "armv7hf": "musleabihf"}.get(str(self._conan_arch))
         # Default to just "musl"
@@ -51,7 +51,8 @@ class MuslConan(ConanFile):
     @property
     def _musl_arch(self):
         # Translate conan arch to musl/clang arch
-        arch = {"armv8": "aarch64"}.get(str(self._conan_arch))
+        arch = {"armv6": "arm",
+                "armv8": "aarch64"}.get(str(self._conan_arch))
         # Default to a one-to-one mapping
         if arch == None:
             arch = self._conan_arch
