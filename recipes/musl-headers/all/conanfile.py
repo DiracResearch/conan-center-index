@@ -13,18 +13,36 @@ class MuslHeadersConan(ConanFile):
     topics = ("libc", "musl")
 
     @property
-    def _target_arch(self):
-        # TODO: Need to translate conan/musl arch names?
+    def _conan_arch(self):
         settings_target = getattr(self, 'settings_target', None)
         if settings_target is None:
             settings_target = self.settings
         return settings_target.arch
 
     @property
+    def _musl_abi(self):
+        # Translate arch to musl abi
+        abi = {"armv6": "musleabi",
+               "armv7": "musleabi",
+               "armv7hf": "musleabihf"}.get(str(self._conan_arch))
+        # Default to just "musl"
+        if abi == None:
+            abi = "musl"
+
+        return abi
+
+    @property
+    def _musl_arch(self):
+        # Translate conan arch to musl/clang arch
+        arch = {"armv8": "aarch64"}.get(str(self._conan_arch))
+        # Default to a one-to-one mapping
+        if arch == None:
+            arch = self._conan_arch
+        return arch
+
+    @property
     def _triplet(self):
-        arch = self._target_arch
-        abi = 'musleabihf'  # TODO: base on settings
-        return f"{arch}-linux-{abi}"
+        return f"{self._musl_arch}-linux-{self._musl_abi}"
 
     def configure(self):
         del self.settings.compiler.cppstd
@@ -37,7 +55,7 @@ class MuslHeadersConan(ConanFile):
         del self.info.settings.compiler
         del self.info.settings.build_type
         del self.info.settings.os
-        self.info.arch = self._target_arch
+        self.info.arch = self._conan_arch
 
     def source(self):
         tools.get(**self.conan_data["sources"][self.version])
