@@ -22,6 +22,13 @@ class ClangUnwindConan(ConanFile):
     topics = ("unwinder", "clang", "llvm")
 
     @property
+    def _host_settings(self):
+        settings_target = getattr(self, 'settings_target', None)
+        if settings_target is None:
+            settings_target = self.settings
+        return settings_target
+
+    @property
     def _conan_arch(self):
         settings_target = getattr(self, 'settings_target', None)
         if settings_target is None:
@@ -79,3 +86,15 @@ class ClangUnwindConan(ConanFile):
     def package(self):
         # Copy the license files
         self.copy("LICENSE.TXT", src=self.name, dst="licenses")
+
+    def package_id(self):
+        # Copy settings from host env.
+        # Need to do this to be able to have llvm-sysroot in "build_requires" in the profile
+        self.info.settings.clear()
+        self.info.settings.compiler = self._host_settings.compiler
+        self.info.settings.compiler.version = self._host_settings.compiler.version
+        self.info.settings.compiler.libc = self._host_settings.compiler.libc
+        self.info.settings.compiler.libcxx = self._host_settings.compiler.libcxx
+        self.info.settings.build_type = self._host_settings.build_type
+        self.info.settings.os = self._host_settings.os
+        self.info.settings.arch = self._host_settings.arch
