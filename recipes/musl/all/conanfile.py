@@ -12,46 +12,53 @@ class MuslConan(ConanFile):
                    "correct in the sense of standards-conformance and safety.")
     settings = "os", "arch", "compiler", "build_type"
     options = {
-        "target": "ANY",
         "shared": [True, False],
-        "fPIC": [True, False],
-        "rtlib": ["compiler-rt", "libgcc"]
+        "fPIC": [True, False]
     }
     default_options = {
-        "target": None,
         "shared": False,
-        "fPIC": True,
-        "rtlib": "compiler-rt"
+        "fPIC": True
     }
-    topics = ("libc", "libcxx", "musl", "clang")
+    topics = ("libc", "musl")
     keep_imports = True
 
     @property
-    def _llvm_triplet(self):
-        arch = self.settings_target.arch  # Translate names?
-        abi = 'musleabihf'  # TODO: base on settings
-        return f"{arch}-linux-{abi}"
-
-    def configure(self):
+    def _conan_arch(self):
         settings_target = getattr(self, 'settings_target', None)
         if settings_target is None:
-            # It is running in 'host', so Conan is compiling this package
-            if not self.options.target:
-                raise ConanInvalidConfiguration(
-                    "A value for option 'target' has to be provided")
-        else:
-            self.options.target = self._llvm_triplet
+            settings_target = self.settings
+        return settings_target.arch
+
+    @property
+    def _musl_abi(self):
+        # Translate arch to musl abi
+        abi = {"armv6": "musleabi",
+               "armv7": "musleabi",
+               "armv7hf": "musleabihf"}.get(str(self._conan_arch))
+        # Default to just "musl"
+        if abi == None:
+            abi = "musl"
+
+        return abi
+
+    @property
+    def _musl_arch(self):
+        # Translate conan arch to musl/clang arch
+        arch = {"armv8": "aarch64"}.get(str(self._conan_arch))
+        # Default to a one-to-one mapping
+        if arch == None:
+            arch = self._conan_arch
+        return arch
+
+    @property
+    def _triplet(self):
+        return f"{self._musl_arch}-linux-{self._musl_abi}"
 
     def requirements(self):
-        # TODO: if option compiler-rt
-        # TODO: use clang version info
-        self.requires.add(f"compiler-rt/10.0.0@dirac/testing")
-
-        # TODO: should probably be a "build requires" with host context
-        self.requires.add(f"linux-headers/4.19.176@dirac/testing")
+        self.requires(f"compiler-rt/10.0.0@dirac/testing")
+        self.requires(f"linux-headers/4.19.176@dirac/testing")
 
     def imports(self):
-        # TODO: if compiler-rt
         # We need the libraries and object files from compile-rt to create a
         # temporary "sysroot" to build the rest of the sysroot (cxx for example)
         self.copy("*", src="lib", dst=f"{self.package_folder}/lib")
@@ -60,10 +67,9 @@ class MuslConan(ConanFile):
         # the "sysroot"
         self.copy("*.h", src="include", dst=f"{self.package_folder}/include")
 
-    def config_options(self):
-        # TODO: Check options
-        if self.settings.os == "Windows":
-            del self.options.fPIC
+    def configure(self):
+        del self.settings.compiler.cppstd
+        del self.settings.compiler.libcxx
 
     def source(self):
         tools.get(**self.conan_data["sources"][self.version])
@@ -74,15 +80,13 @@ class MuslConan(ConanFile):
         # Trick to get the correct logic when settings_target is needed...
         with tools.chdir(self.name), \
                 tools.environment_append({"LIBCC": "-lcompiler_rt"}), \
-                tools.environment_append({"CFLAGS": f"-target={self.options.target}"}), \
+                tools.environment_append({"CFLAGS": f"-target {self._triplet}"}), \
                 tools.environment_append({"LDFLAGS": f"-fuse-ld=lld -L{self.deps_cpp_info['compiler-rt'].rootpath}/lib"}):
             self.run(
-                f"./configure --target={self.options.target} --prefix={self.package_folder}")
+                f"./configure --target={self._triplet} --prefix={self.package_folder}")
             self.run("make")
             self.run("make install")
 
     def package(self):
-        pass
-
-    def package_info(self):
-        pass
+        # Copy the license files
+        self.copy("COPYRIGHT", src="musl", dst="licenses")
