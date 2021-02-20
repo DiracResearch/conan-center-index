@@ -1,30 +1,19 @@
 import os
-import stat
 from conans import ConanFile, tools, AutoToolsBuildEnvironment
-from conans.errors import ConanException
 
-class MuslConan(ConanFile):
+
+class LinuxHeadersConan(ConanFile):
     name = "linux-headers"
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "https://www.kernel.org/"
-    license = "GPL"
-    description = ("todo")
+    license = "GPLv2"
+    description = ("Headers for the Linux Kernel operating system")
     settings = "os", "arch", "compiler", "build_type"
-    no_copy_source=True
-    options = {
-        "shared": [True, False],
-        "fPIC": [True, False]
-    }
-    default_options = {
-        "shared": False,
-        "fPIC": True
-    }
+    topics = ("linux", "kernel", "headers")
+    no_copy_source = True
 
-    topics = ("linux")
-
-    def config_options(self):
-        # TODO: Check options
-        pass
+    def package_id(self):
+        self.info.header_only()
 
     def source(self):
         tools.get(**self.conan_data["sources"][self.version])
@@ -32,6 +21,13 @@ class MuslConan(ConanFile):
     def build(self):
         with tools.chdir(f"{self.source_folder}/linux-{self.version}"):
             autotools = AutoToolsBuildEnvironment(self)
-            # We only need the headers from linux so run the 'headers_install' target
-            autotools.make(target="headers_install", args=[f"INSTALL_HDR_PATH={self.package_folder}"])
-            # TODO: clean up .cmd files
+            # We only want the headers from linux so run the 'headers_install' target
+            autotools.make(target="headers_install", args=[
+                           f"INSTALL_HDR_PATH={self.build_folder}"])
+
+    def package(self):
+        self.copy("*.h", src="include", dst="include")
+
+        # Copy the license files
+        self.copy(
+            pattern="*", src=os.path.join(f"linux-{self.version}", "LICENSES"), dst="licenses")
