@@ -8,8 +8,9 @@ class ClangLibcxxabiConan(ConanFile):
     name = "libcxxabi"
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "https://libcxxabi.llvm.org/"
-    license = "MIT"
-    description = ("todo")
+    description = (
+        "libc++abi is a new implementation of low level support for a standard C++ library.")
+    license = "Apache License v2.0"
     settings = "os", "arch", "compiler", "build_type"
     options = {
         "shared": [True, False],
@@ -19,56 +20,80 @@ class ClangLibcxxabiConan(ConanFile):
         "shared": False,
         "fPIC": True
     }
-    topics = ("libc", "libcxxabi", "clang")
+    topics = ("libcxxabi", "clang")
+
+    @property
+    def _conan_arch(self):
+        settings_target = getattr(self, 'settings_target', None)
+        if settings_target is None:
+            settings_target = self.settings
+        return settings_target.arch
+
+    @property
+    def _musl_abi(self):
+        # Translate arch to musl abi
+        abi = {"armv6": "musleabi",
+               "armv7": "musleabi",
+               "armv7hf": "musleabihf"}.get(str(self._conan_arch))
+        # Default to just "musl"
+        if abi == None:
+            abi = "musl"
+
+        return abi
+
+    @property
+    def _musl_arch(self):
+        # Translate conan arch to musl/clang arch
+        arch = {"armv8": "aarch64"}.get(str(self._conan_arch))
+        # Default to a one-to-one mapping
+        if arch == None:
+            arch = self._conan_arch
+        return arch
+
+    @property
+    def _triplet(self):
+        return "{}-linux-{}".format(self._musl_arch, self._musl_abi)
 
     def requirements(self):
-        # self.requires.add(f"linux/4.19.176@dirac/testing")
-        # TODO: if option libc musl
-        self.requires.add(f"musl/1.2.2@dirac/testing")
-        # TODO: based on option unwinder
-        self.requires.add(f"libunwind-llvm/{self.version}@dirac/testing")
-
-    def config_options(self):
-        # TODO: Check options
-        if self.settings.os == "Windows":
-            del self.options.fPIC
-
-    def configure(self):
-        pass
+        self.requires("musl/1.2.2@dirac/testing")
+        self.requires("libunwind-llvm/{}@dirac/testing".format(self.version))
 
     def source(self):
         tools.get(**self.conan_data["sources"][self.version])
-        os.rename(f"{self.name}-{self.version}.src", self.name)
+        os.rename("{}-{}.src".format(self.name, self.version), self.name)
 
-        # We need to fetch the headers for libcc
-        tools.get(**self.conan_data["sources-libcxx"][self.version])
-        os.rename(f"libcxx-{self.version}.src", "libcxx")
+        # We need to fetch the headers for libcxx
+        # Had this in "conandata.yml" before but CCI doesn't allow it.
+        # Could create a "libcxx-header target maybe..."
+        libcxx_url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.0/libcxx-10.0.0.src.tar.xz"
+        libcxx_sha = "270f8a3f176f1981b0f6ab8aa556720988872ec2b48ed3b605d0ced8d09156c7"
+        tools.get(url=libcxx_url, sha256=libcxx_sha)
+        os.rename("libcxx-{}.src".format(self.version), "libcxx")
 
     def build(self):
-        # TODO: if unwinder
         # We need to handle the dependencies and flags more "manual" because
         # building this libs is a bit different from the normal stuff.
-        with tools.environment_append({"LDFLAGS": f"-fuse-ld=lld -L{self.deps_cpp_info['libunwind-llvm'].rootpath}/lib"}):
+        with tools.environment_append({"LDFLAGS": "-fuse-ld=lld -L{}/lib".format(self.deps_cpp_info['libunwind-llvm'].rootpath)}):
             cmake = CMake(self)
             cmake.definitions["CMAKE_SYSROOT"] = self.deps_cpp_info["musl"].rootpath
-            cmake.definitions["CMAKE_C_COMPILER_TARGET"] = "armv7-linux-musleabihf"
-            cmake.definitions["CMAKE_CXX_COMPILER_TARGET"] = "armv7-linux-musleabihf"
-            cmake.definitions["CMAKE_ASM_COMPILER_TARGET"] = "armv7-linux-musleabihf"
+            cmake.definitions["CMAKE_C_COMPILER_TARGET"] = self._triplet
+            cmake.definitions["CMAKE_CXX_COMPILER_TARGET"] = self._triplet
+            cmake.definitions["CMAKE_ASM_COMPILER_TARGET"] = self._triplet
             cmake.definitions["CMAKE_TRY_COMPILE_TARGET_TYPE"] = "STATIC_LIBRARY"
-            cmake.definitions["LIBCXXABI_TARGET_TRIPLE"] = "armv7-linux-musleabihf"
-            # TODO: if unwinder
+            cmake.definitions["LIBCXXABI_TARGET_TRIPLE"] = self._triplet
             cmake.definitions["LIBCXXABI_USE_LLVM_UNWINDER"] = True
-            # TODO: if musl compiler rt
             cmake.definitions["LIBCXXABI_USE_COMPILER_RT"] = True
-            cmake.definitions["LIBCXXABI_LIBCXX_INCLUDES"] = f"{self.build_folder}/libcxx/include"
+            cmake.definitions["LIBCXXABI_LIBCXX_INCLUDES"] = "{}/libcxx/include".format(
+                self.build_folder)
             cmake.configure(source_folder=self.name,
-                            build_folder=f"{self.name}-bin")
+                            build_folder="{}-bin".format(self.name))
             cmake.build()
             cmake.install()
 
     def package(self):
         # Headers not installed by CMake, copy manually
-        self.copy(pattern="*.h", dst="include", src=f"{self.name}/include")
+        self.copy(pattern="*.h", dst="include",
+                  src="{}/include".format(self.name))
 
-    def package_info(self):
-        pass
+        # Copy the license files
+        self.copy("LICENSE.TXT", src=self.name, dst="licenses")
