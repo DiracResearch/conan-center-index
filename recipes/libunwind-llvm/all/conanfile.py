@@ -1,14 +1,14 @@
 import os
-import stat
-from conans import ConanFile, tools, AutoToolsBuildEnvironment, CMake
+from conans import ConanFile, tools, CMake
 from conans.errors import ConanException
+
 
 class ClangUnwindConan(ConanFile):
     name = "libunwind-llvm"
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "https://llvm.org/"
-    license = "MIT"
-    description = ("todo")
+    license = "Apache License v2.0"
+    description = ("Unwind library from LLVM")
     exports_sources = ["CMakeLists.txt"]
     settings = "os", "arch", "compiler", "build_type"
     options = {
@@ -19,43 +19,63 @@ class ClangUnwindConan(ConanFile):
         "shared": False,
         "fPIC": True,
     }
-    topics = ("libc", "unwinder", "clang", "llvm")
+    topics = ("unwinder", "clang", "llvm")
+
+    @property
+    def _conan_arch(self):
+        settings_target = getattr(self, 'settings_target', None)
+        if settings_target is None:
+            settings_target = self.settings
+        return settings_target.arch
+
+    @property
+    def _musl_abi(self):
+        # Translate arch to musl abi
+        abi = {"armv6": "musleabi",
+               "armv7": "musleabi",
+               "armv7hf": "musleabihf"}.get(str(self._conan_arch))
+        # Default to just "musl"
+        if abi == None:
+            abi = "musl"
+
+        return abi
+
+    @property
+    def _musl_arch(self):
+        # Translate conan arch to musl/clang arch
+        arch = {"armv8": "aarch64"}.get(str(self._conan_arch))
+        # Default to a one-to-one mapping
+        if arch == None:
+            arch = self._conan_arch
+        return arch
+
+    @property
+    def _triplet(self):
+        return "{}-linux-{}".format(self._musl_arch, self._musl_abi)
 
     def requirements(self):
-        # TODO: if option libc musl
-        self.requires.add(f"musl/1.2.2@dirac/testing")
-
-    def config_options(self):
-        # TODO: Check options
-        if self.settings.os == "Windows":
-            del self.options.fPIC
-
-    def configure(self):
-        pass
+        self.requires("musl/1.2.2@dirac/testing")
 
     def source(self):
         tools.get(**self.conan_data["sources"][self.version])
-        os.rename(f"libunwind-{self.version}.src", self.name)
+        os.rename("libunwind-{}.src".format(self.version), self.name)
 
     def build(self):
         with tools.environment_append({"LDFLAGS": "-fuse-ld=lld"}):
             cmake = CMake(self)
-            # TODO: if musl
-            cmake.definitions["CMAKE_SYSROOT"] =  self.deps_cpp_info["musl"].rootpath
-            cmake.definitions["CMAKE_C_COMPILER_TARGET"] = "armv7-linux-musleabihf"
-            cmake.definitions["CMAKE_CXX_COMPILER_TARGET"] = "armv7-linux-musleabihf"
-            cmake.definitions["CMAKE_ASM_COMPILER_TARGET"] = "armv7-linux-musleabihf"
+            cmake.definitions["CMAKE_SYSROOT"] = self.deps_cpp_info["musl"].rootpath
+            cmake.definitions["CMAKE_C_COMPILER_TARGET"] = self._triplet
+            cmake.definitions["CMAKE_CXX_COMPILER_TARGET"] = self._triplet
+            cmake.definitions["CMAKE_ASM_COMPILER_TARGET"] = self._triplet
             cmake.definitions["CMAKE_TRY_COMPILE_TARGET_TYPE"] = "STATIC_LIBRARY"
-            # TODO: if musl uses complier-rt
             cmake.definitions["LIBUNWIND_USE_COMPILER_RT"] = True
             cmake.definitions["LLVM_ENABLE_LIBCXX"] = True
 
-            cmake.configure(source_folder=self.name, build_folder=f"{self.name}-bin")
+            cmake.configure(source_folder=self.name,
+                            build_folder="{}-bin".format(self.name))
             cmake.build()
             cmake.install()
 
     def package(self):
-        pass
-
-    def package_info(self):
-        pass
+        # Copy the license files
+        self.copy("LICENSE.TXT", src=self.name, dst="licenses")
