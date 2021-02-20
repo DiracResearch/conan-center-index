@@ -1,16 +1,16 @@
 import os
-import stat
-from conans import ConanFile, tools, AutoToolsBuildEnvironment, CMake
+from glob import glob
+from conans import ConanFile, tools, CMake
 from conans.errors import ConanException
+
 
 class CompilerRtConan(ConanFile):
     name = "compiler-rt"
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "https://compiler-rt.llvm.org/"
-    license = "MIT"
-    description = ("todo")
+    license = "Apache License v2.0"
+    description = ("Compiler runtime components from LLVM")
     settings = "os", "arch", "compiler", "build_type"
-    # TODO: option libc, musl or glibc
     options = {
         "shared": [True, False],
         "fPIC": [True, False]
@@ -19,19 +19,46 @@ class CompilerRtConan(ConanFile):
         "shared": False,
         "fPIC": True
     }
-    topics = ("compiler-rt", "clang")
+    topics = ("compiler-rt", "clang", "bulit-ins")
 
-    def requirements(self):
-        # TODO: if option musl
-        self.requires.add(f"musl-headers/1.2.2@dirac/testing")
+    @property
+    def _conan_arch(self):
+        settings_target = getattr(self, 'settings_target', None)
+        if settings_target is None:
+            settings_target = self.settings
+        return settings_target.arch
 
-    def config_options(self):
-        # TODO: Check options
-        if self.settings.os == "Windows":
-            del self.options.fPIC
+    @property
+    def _musl_abi(self):
+        # Translate arch to musl abi
+        abi = {"armv6": "musleabi",
+               "armv7": "musleabi",
+               "armv7hf": "musleabihf"}.get(str(self._conan_arch))
+        # Default to just "musl"
+        if abi == None:
+            abi = "musl"
+
+        return abi
+
+    @property
+    def _musl_arch(self):
+        # Translate conan arch to musl/clang arch
+        arch = {"armv8": "aarch64"}.get(str(self._conan_arch))
+        # Default to a one-to-one mapping
+        if arch == None:
+            arch = self._conan_arch
+        return arch
+
+    @property
+    def _triplet(self):
+        return f"{self._musl_arch}-linux-{self._musl_abi}"
 
     def configure(self):
-        pass
+        del self.settings.compiler.cppstd
+        del self.settings.compiler.libcxx
+
+    def requirements(self):
+        self.requires(f"musl-headers/1.2.2@dirac/testing")
 
     def source(self):
         tools.get(**self.conan_data["sources"][self.version])
@@ -41,12 +68,11 @@ class CompilerRtConan(ConanFile):
         # Tips and tricks from: https://llvm.org/docs/HowToCrossCompileBuiltinsOnArm.html
         cmake = CMake(self)
 
-        # TODO: if musl
         # We use the musl headers as our, temporary, small sysroot
-        cmake.definitions["CMAKE_SYSROOT"] =  self.deps_cpp_info["musl-headers"].rootpath
+        cmake.definitions["CMAKE_SYSROOT"] = self.deps_cpp_info["musl-headers"].rootpath
 
-        cmake.definitions["CMAKE_C_COMPILER_TARGET"] = "armv7-linux-musleabihf"
-        cmake.definitions["CMAKE_ASM_COMPILER_TARGET"] = "armv7-linux-musleabihf"
+        cmake.definitions["CMAKE_C_COMPILER_TARGET"] = self._triplet
+        cmake.definitions["CMAKE_ASM_COMPILER_TARGET"] = self._triplet
         cmake.definitions["COMPILER_RT_DEFAULT_TARGET_ONLY"] = True
         cmake.definitions["CMAKE_TRY_COMPILE_TARGET_TYPE"] = "STATIC_LIBRARY"
         # TODO: Try to build sanitizers also
@@ -54,18 +80,22 @@ class CompilerRtConan(ConanFile):
         cmake.definitions["COMPILER_RT_BUILD_XRAY"] = False
         cmake.definitions["COMPILER_RT_BUILD_LIBFUZZER"] = False
         cmake.definitions["COMPILER_RT_BUILD_PROFILE"] = False
-        cmake.configure(source_folder=self.name, build_folder="compiler-rt-bin")
+        cmake.configure(source_folder=self.name,
+                        build_folder="compiler-rt-bin")
         cmake.build()
         cmake.install()
 
-        # TODO: Fix hard coded `armhf`, regex or similar
-        os.rename(f"{self.package_folder}/lib/linux/clang_rt.crtbegin-armhf.o", f"{self.package_folder}/lib/crtbeginS.o")
-        os.rename(f"{self.package_folder}/lib/linux/clang_rt.crtend-armhf.o", f"{self.package_folder}/lib/crtendS.o")
-        os.rename(f"{self.package_folder}/lib/linux/libclang_rt.builtins-armhf.a", f"{self.package_folder}/lib/libcompiler_rt.a")
-        os.rmdir(f"{self.package_folder}/lib/linux")
-
     def package(self):
-        pass
+        lib_dir = os.path.join(self.package_folder, "lib")
+        linux_dir = os.path.join(lib_dir, "linux")
+        crt_begin = glob(os.path.join(linux_dir, "clang_rt.crtbegin*"))[0]
+        crt_end = glob(os.path.join(linux_dir, "clang_rt.crtend*"))[0]
+        clang_rt = glob(os.path.join(linux_dir, "libclang_rt*"))[0]
 
-    def package_info(self):
-        pass
+        os.rename(crt_begin, os.path.join(lib_dir, "crtbeginS.o"))
+        os.rename(crt_end, os.path.join(lib_dir, "crtendS.o"))
+        os.rename(clang_rt, os.path.join(lib_dir, "libcompiler_rt.a"))
+        os.rmdir(linux_dir)
+
+        # Copy the license files
+        self.copy("LICENSE.TXT", src="compiler-rt", dst="licenses")

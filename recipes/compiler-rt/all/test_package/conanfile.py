@@ -1,22 +1,18 @@
 import os
-from conans import ConanFile, CMake, tools
+from conans import ConanFile, tools
+from conans.errors import ConanException
 
-class TestZlibConan(ConanFile):
+
+class TestCompilerRtConan(ConanFile):
     settings = "os", "compiler", "arch", "build_type"
-    generators = "cmake", "pkg_config"
-
-    def configure(self):
-        del self.settings.compiler.libcxx
-
-    def build(self):
-        cmake = CMake(self)
-        cmake.configure()
-        cmake.build()
 
     def test(self):
-        #assert os.path.exists(os.path.join(self.deps_cpp_info["zlib"].rootpath, "licenses", "LICENSE"))
-        #assert os.path.exists(os.path.join(self.build_folder, "zlib.pc"))
-        if not tools.cross_building(self.settings):
-            #self.run(os.path.join("bin", "test"), run_environment=True)
-            pass
+        file_to_check = os.path.join("lib", "libcompiler_rt.a")
+        file_path = os.path.join(
+            self.deps_cpp_info['compiler-rt'].rootpath, file_to_check)
 
+        if not os.path.isfile(file_path):
+            raise ConanException(
+                f"Expected {file_to_check} to exist but it doesn't!")
+
+        print(f"found: {file_to_check}")
