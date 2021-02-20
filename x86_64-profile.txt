@@ -1,0 +1,16 @@
+[settings]
+arch=x86_64
+build_type=Release
+compiler=clang
+compiler.libcxx=libc++
+compiler.libc=musl
+compiler.version=10
+os=Linux
+[build_requires]
+llvm-sysroot/10.0.0@dirac/testing
+[options]
+[env]
+CC=/usr/bin/clang-10
+CXX=/usr/bin/clang++-10
+AR=/usr/bin/llvm-ar-10
+RANLIB=/usr/bin/llvm-ranlib-10

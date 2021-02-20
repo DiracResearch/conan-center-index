@@ -1,0 +1,14 @@
+[settings]
+arch=armv8
+build_type=Release
+compiler=clang
+compiler.libcxx=libc++
+compiler.version=10
+os=Linux
+[build_requires]
+[options]
+[env]
+CC=/usr/bin/clang-10
+CXX=/usr/bin/clang++-10
+AR=/usr/bin/llvm-ar-10
+RANLIB=/usr/bin/llvm-ranlib-10
