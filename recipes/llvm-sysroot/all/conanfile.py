@@ -78,6 +78,7 @@ class LlvmSysrootConan(ConanFile):
         self.copy("*", src="licenses", dst=f"{self.package_folder}/licenses")
 
     def package_info(self):
+        # Setup the final sysroot and compiler flags
         sysroot = self.package_folder
 
         self.output.info(f"Creating SYSROOT environment variable: {sysroot}")
@@ -87,8 +88,12 @@ class LlvmSysrootConan(ConanFile):
         self.output.info('Creating CHOST environment variable: %s' % self._triplet)
         self.env_info.CHOST = self._triplet
 
-        self.env_info.CFLAGS = f"-target {self._triplet} --sysroot={sysroot}"
-        self.env_info.CXXFLAGS = f"-target {self._triplet} --sysroot={sysroot} -I{sysroot}/include/c++/v1"
+        cflags= f"-nostdinc -target {self._triplet} --sysroot={sysroot} -I{sysroot}/include"
+        self.env_info.CFLAGS = cflags
+        self.env_info.ASFLAGS = cflags
+        self.env_info.ASMFLAGS = cflags
+        self.env_info.CXXFLAGS = f"{cflags} -I{sysroot}/include/c++/v1"
+        # TODO: asm flags
 
         # TODO: static should be and option. Or left up to the consumer?
         # TODO: Distinguish between ldflags for c and c++?
