@@ -1,13 +1,15 @@
-cmake_minimum_required(VERSION 3.0.0)
-project(cmake_wrapper)
+cmake_minimum_required(VERSION 3.0)
+project(conanlibcxx)
 
-include("conanbuildinfo.cmake")
+# Force this include before to fix:
+#  ../libcxx/include/cstddef:44:15: fatal error: 'stddef.h' file not found
+#  #include_next <stddef.h>
+include_directories(BEFORE "source_subfolder/include")
+
+message(STATUS "Conan CMake Wrapper")
+include(conanbuildinfo.cmake)
 conan_basic_setup()
 
-include_directories(${CONAN_INCLUDE_DIRS})
+set(LIBCXX_STANDALONE_BUILD 1)
 
-# Since we wrap the CMakeFile the logic in the clang source
-# will think it's not built in "standalone" mode. So we force it here.
-set(COMPILER_RT_STANDALONE_BUILD ON)
-
-add_subdirectory(source_subfolder)
+add_subdirectory("source_subfolder")
