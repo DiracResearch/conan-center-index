@@ -11,6 +11,7 @@ class MuslHeadersConan(ConanFile):
                    "correct in the sense of standards-conformance and safety.")
     settings = "os", "arch", "compiler", "build_type"
     topics = ("libc", "musl")
+    keep_imports = True
 
     @property
     def _conan_arch(self):
@@ -22,7 +23,7 @@ class MuslHeadersConan(ConanFile):
     @property
     def _musl_abi(self):
         # Translate arch to musl abi
-        abi = {"armv6": "musleabi",
+        abi = {"armv6": "musleabihf",
                "armv7": "musleabi",
                "armv7hf": "musleabihf"}.get(str(self._conan_arch))
         # Default to just "musl"
@@ -34,7 +35,8 @@ class MuslHeadersConan(ConanFile):
     @property
     def _musl_arch(self):
         # Translate conan arch to musl/clang arch
-        arch = {"armv8": "aarch64"}.get(str(self._conan_arch))
+        arch = {"armv6": "arm",
+                "armv8": "aarch64"}.get(str(self._conan_arch))
         # Default to a one-to-one mapping
         if arch == None:
             arch = self._conan_arch
@@ -55,7 +57,15 @@ class MuslHeadersConan(ConanFile):
         del self.info.settings.compiler
         del self.info.settings.build_type
         del self.info.settings.os
-        self.info.arch = self._conan_arch
+        self.info.settings.arch = self._conan_arch
+
+    def requirements(self):
+        self.requires(f"linux-headers/4.19.176@dirac/testing")
+
+    def imports(self):
+        # Copy linux headers to package folder. The package folder is used as
+        # the "sysroot"
+        self.copy("*.h", src="include", dst=f"{self.package_folder}/include")
 
     def source(self):
         tools.get(**self.conan_data["sources"][self.version])
