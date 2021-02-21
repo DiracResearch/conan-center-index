@@ -61,11 +61,13 @@ class LlvmSysrootConan(ConanFile):
     def package_id(self):
         del self.info.settings.arch_target
         del self.info.settings.os_target
+        # This sysroot can support multiple cppstd versions, we can remove this from package id
+        del self.info.settings.compiler.cppstd
+        # If the recipe that triggers the build of this sysroot have removed c++ we add it back here.
+        # We don't need one sysroot with and one sysroot without c++. We always have both.
+        self.info.settings.compiler.libcxx = "libc++"
 
     def requirements(self):
-        self.requires(f"musl/1.2.2@dirac/testing", override=True)
-        self.requires(f"musl-headers/1.2.2@dirac/testing", override=True)
-        self.requires(f"compiler-rt/{self.version}@dirac/testing", override=True)
         self.requires(f"libcxx/{self.version}@dirac/testing")
 
     def imports(self):
