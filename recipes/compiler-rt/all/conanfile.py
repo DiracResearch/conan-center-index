@@ -16,25 +16,11 @@ class CompilerRtConan(ConanFile):
     topics = ("compiler-rt", "clang", "bulit-ins")
 
     @property
-    def _host_settings(self):
-        settings_target = getattr(self, 'settings_target', None)
-        if settings_target is None:
-            settings_target = self.settings
-        return settings_target
-
-    @property
-    def _conan_arch(self):
-        settings_target = getattr(self, 'settings_target', None)
-        if settings_target is None:
-            settings_target = self.settings
-        return settings_target.arch
-
-    @property
     def _musl_abi(self):
         # Translate arch to musl abi
         abi = {"armv6": "musleabihf",
                "armv7": "musleabi",
-               "armv7hf": "musleabihf"}.get(str(self._conan_arch))
+               "armv7hf": "musleabihf"}.get(str(self.settings.arch))
         # Default to just "musl"
         if abi == None:
             abi = "musl"
@@ -45,30 +31,38 @@ class CompilerRtConan(ConanFile):
     def _musl_arch(self):
         # Translate conan arch to musl/clang arch
         arch = {"armv6": "arm",
-                "armv8": "aarch64"}.get(str(self._conan_arch))
+                "armv8": "aarch64"}.get(str(self.settings.arch))
         # Default to a one-to-one mapping
         if arch == None:
-            arch = self._conan_arch
+            arch = str(self.settings.arch)
         return arch
 
     @property
     def _triplet(self):
-        return f"{self._musl_arch}-linux-{self._musl_abi}"
+        return "{}-linux-{}".format(self._musl_arch, self._musl_abi)
+
+    def _force_host_context(self):
+        # If this recipe is a "build_requires" in the host profile we force
+        # the settings to instead be settings_target.
+        # Ideally it should possible to express "force_host_context"
+        # under [build_requires] in the profile.
+        settings_target = getattr(self, 'settings_target', None)
+        if settings_target:
+            self.settings = settings_target
+            # For some reason we need to populate these manually
+            self.settings.arch_build = self.settings_build.arch
+            self.settings.os_build = self.settings_build.os
+            self.settings.arch_target = settings_target.arch
+            self.settings.os_target = settings_target.os
 
     def configure(self):
+        self._force_host_context()
         del self.settings.compiler.cppstd
         del self.settings.compiler.libcxx
 
     def package_id(self):
-        # Copy settings from host env.
-        # Need to do this to be able to have llvm-sysroot in "build_requires" in the profile
-        self.info.settings.clear()
-        self.info.settings.compiler = self._host_settings.compiler
-        self.info.settings.compiler.version = self._host_settings.compiler.version
-        self.info.settings.compiler.libc = self._host_settings.compiler.libc
-        self.info.settings.build_type = self._host_settings.build_type
-        self.info.settings.os = self._host_settings.os
-        self.info.settings.arch = self._host_settings.arch
+        del self.info.settings.arch_target
+        del self.info.settings.os_target
 
     def requirements(self):
         self.requires(f"musl-headers/1.2.2@dirac/testing")
