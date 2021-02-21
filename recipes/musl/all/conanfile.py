@@ -1,5 +1,5 @@
 import os
-from conans import ConanFile, tools
+from conans import ConanFile, tools, AutoToolsBuildEnvironment
 from conans.errors import ConanException, ConanInvalidConfiguration
 
 
@@ -23,30 +23,8 @@ class MuslConan(ConanFile):
     keep_imports = True
 
     @property
-    def _musl_abi(self):
-        # Translate arch to musl abi
-        abi = {"armv6": "musleabihf",
-               "armv7": "musleabi",
-               "armv7hf": "musleabihf"}.get(str(self.settings.arch))
-        # Default to just "musl"
-        if abi == None:
-            abi = "musl"
-
-        return abi
-
-    @property
-    def _musl_arch(self):
-        # Translate conan arch to musl/clang arch
-        arch = {"armv6": "arm",
-                "armv8": "aarch64"}.get(str(self.settings.arch))
-        # Default to a one-to-one mapping
-        if arch == None:
-            arch = str(self.settings.arch)
-        return arch
-
-    @property
     def _triplet(self):
-        return "{}-linux-{}".format(self._musl_arch, self._musl_abi)
+        return self.deps_cpp_info["musl-headers"].CHOST
 
     def _force_host_context(self):
         # If this recipe is a "build_requires" in the host profile we force
@@ -88,17 +66,28 @@ class MuslConan(ConanFile):
         os.rename(f"{self.name}-{self.version}", self.name)
 
     def build(self):
-        # Never got it to work with AutoToolsBuildEnvironment.
-        # Trick to get the correct logic when settings_target is needed...
         with tools.chdir(self.name), \
-                tools.environment_append({"LIBCC": "-lcompiler_rt"}), \
-                tools.environment_append({"CFLAGS": f"-target {self._triplet}"}), \
-                tools.environment_append({"LDFLAGS": f"-fuse-ld=lld -L{self.deps_cpp_info['compiler-rt'].rootpath}/lib"}):
-            self.run(
-                f"./configure --target={self._triplet} --prefix={self.package_folder}")
-            self.run("make")
-            self.run("make install")
+             tools.environment_append({"LIBCC": "-lcompiler_rt"}):
+            autotools = AutoToolsBuildEnvironment(self)
+            autotools.configure(target=self._triplet)
+            autotools.make()
+            autotools.install()
 
     def package(self):
         # Copy the license files
         self.copy("COPYRIGHT", src="musl", dst="licenses")
+
+    def package_info(self):
+        # Setup the third sysroot and compiler flags
+        # This is a sysroot with libc and linux headers together with compiler rt built-ins and crt
+        # and a libc
+        sysroot = self.package_folder
+        self.cpp_info.CHOST = self._triplet
+        flags = ["-nostdinc", "-target", self._triplet, f"--sysroot={sysroot}", f"-I{sysroot}/include"]
+        self.cpp_info.cflags = flags
+        self.cpp_info.cxxflags = flags
+
+        linker_flags = ["-fuse-ld=lld", "-nostdlib", "-lc", "-lcompiler_rt",
+                        f"{sysroot}/lib/crt1.o", f"{sysroot}/lib/crtendS.o", f"{sysroot}/lib/crtn.o", "-static"]
+        self.cpp_info.sharedlinkflags = linker_flags
+        self.cpp_info.exelinkflags = linker_flags
