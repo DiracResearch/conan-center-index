@@ -11,7 +11,6 @@ class MuslHeadersConan(ConanFile):
                    "correct in the sense of standards-conformance and safety.")
     settings = "os", "arch", "compiler", "build_type"
     topics = ("libc", "musl")
-    keep_imports = True
 
     @property
     def _conan_arch(self):
@@ -46,9 +45,12 @@ class MuslHeadersConan(ConanFile):
     def _triplet(self):
         return f"{self._musl_arch}-linux-{self._musl_abi}"
 
-    def configure(self):
-        del self.settings.compiler.cppstd
-        del self.settings.compiler.libcxx
+    def requirements(self):
+        self.requires(f"linux-headers/4.19.176@dirac/testing")
+
+    #def configure(self):
+    #    del self.settings.compiler.cppstd
+    #    del self.settings.compiler.libcxx
 
     def package_id(self):
         # Even though this is a header only recipe the headers generated
@@ -59,14 +61,6 @@ class MuslHeadersConan(ConanFile):
         del self.info.settings.os
         self.info.settings.arch = self._conan_arch
 
-    def requirements(self):
-        self.requires(f"linux-headers/4.19.176@dirac/testing")
-
-    def imports(self):
-        # Copy linux headers to package folder. The package folder is used as
-        # the "sysroot"
-        self.copy("*.h", src="include", dst=f"{self.package_folder}/include")
-
     def source(self):
         tools.get(**self.conan_data["sources"][self.version])
         os.rename(f"musl-{self.version}", "musl")
@@ -74,9 +68,9 @@ class MuslHeadersConan(ConanFile):
     def build(self):
         # TODO: winbash = true?
         with tools.chdir("musl"), \
-                tools.environment_append({"CFLAGS": f"-target {self._triplet}"}):
+                tools.environment_append({"CFLAGS": "-target {}".format(self._triplet)}):
             self.run(
-                f"./configure --target={self._triplet} --prefix={self.package_folder}")
+                "./configure --target={} --prefix={}".format(self._triplet, self.package_folder))
             self.run("make install-headers")
 
     def package(self):
@@ -84,10 +78,12 @@ class MuslHeadersConan(ConanFile):
         self.copy("COPYRIGHT", src="musl", dst="licenses")
 
     def package_info(self):
-        # Setup the first sysroot and compiler flags
-        # This is a sysroot with just libc and linux headers
-        sysroot = self.package_folder
+        # This is where we boot strap ourselves
+        # We start by setting "-target" and -nostdinc/lib
+        # We do assume llvm/clang so we also set use-ld=lld
         self.cpp_info.CHOST = self._triplet
-        flags = ["-nostdinc", "-target", self._triplet, f"--sysroot={sysroot}", f"-I{sysroot}/include"]
+        flags = ["-nostdinc", "-target", self._triplet]
         self.cpp_info.cflags = flags
         self.cpp_info.cxxflags = flags
+        linker_flags = ["-fuse-ld=lld", "-nostdlib"]
+        self.cpp_info.sharedlinkflags = linker_flags
