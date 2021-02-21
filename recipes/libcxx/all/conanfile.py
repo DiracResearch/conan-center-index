@@ -70,9 +70,6 @@ class ClangLibcxxConan(ConanFile):
         if self.settings.os == "Windows":
             del self.options.fPIC
 
-    def configure(self):
-        pass
-
     def source(self):
         tools.get(**self.conan_data["sources"][self.version])
         os.rename("{}-{}.src".format(self.name, self.version), self.name)
