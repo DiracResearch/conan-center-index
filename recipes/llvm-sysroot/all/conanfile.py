@@ -43,27 +43,33 @@ class LlvmSysrootConan(ConanFile):
         self.info.requires.clear()
 
     def requirements(self):
-        self.requires(f"libcxx/{self.version}@dirac/testing")
+        self.requires("libcxx/{}@dirac/testing".format(self.version))
 
     def imports(self):
         # Repackage the sysroot for consumption
-        self.copy("*", src="lib", dst=f"{self.package_folder}/lib")
-        self.copy("*", src="include", dst=f"{self.package_folder}/include")
-        self.copy("*", src="bin", dst=f"{self.package_folder}/bin")
-        self.copy("*", src="licenses", dst=f"{self.package_folder}/licenses")
+        self.copy("*", src="lib", dst="lib")
+        self.copy("*", src="include", dst="include")
+        self.copy("*", src="bin", dst="bin")
+        self.copy("*", src="licenses", dst="licenses")
+
+    def package(self):
+        self.copy("*")
 
     def package_info(self):
         # Setup the final sysroot and compiler flags
         sysroot = self.package_folder
 
-        self.output.info('Creating CHOST environment variable: %s' % self._triplet)
+        self.output.info(
+            'Creating CHOST environment variable: %s' % self._triplet)
         self.env_info.CHOST = self._triplet
 
-        cflags= f"-nostdinc -target {self._triplet} --sysroot={sysroot} -I{sysroot}/include"
+        cflags = "-nostdinc -target {0} --sysroot={1} -I{1}/include".format(
+            self._triplet, sysroot)
         self.env_info.CFLAGS = cflags
         self.env_info.ASFLAGS = cflags
         self.env_info.ASMFLAGS = cflags
-        self.env_info.CXXFLAGS = f"-I{sysroot}/include/c++/v1 {cflags}"
+        self.env_info.CXXFLAGS = "-I{}/include/c++/v1 {}".format(
+            sysroot, cflags)
         # TODO: asm flags
 
         # TODO: static should be and option. Or left up to the consumer?
@@ -71,14 +77,13 @@ class LlvmSysrootConan(ConanFile):
         # TODO: Escape paths? Use ""?
         self.env_info.LDFLAGS = "-fuse-ld=lld -nostdlib -lunwind -lc -lc++abi -lc++ "\
                                 "-lcompiler_rt "\
-                                f"{sysroot}/lib/crt1.o "\
-                                f"{sysroot}/lib/crtendS.o "\
-                                f"{sysroot}/lib/crtn.o "\
-                                "-static"
+                                "{0}/lib/crt1.o " \
+                                "{0}/lib/crtendS.o " \
+                                "{0}/lib/crtn.o " \
+                                "-static".format(sysroot)
 
         # TODO: Set CC/LD/AR/RANLIB here or is it up to the profile to decide?
         # TODO: Test with auto tools
         # TODO: Test with a bunch of packages
 
         # TODO: Might have to do RPATH things
-
