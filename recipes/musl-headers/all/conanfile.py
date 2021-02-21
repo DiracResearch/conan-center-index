@@ -82,3 +82,12 @@ class MuslHeadersConan(ConanFile):
     def package(self):
         # Copy the license files
         self.copy("COPYRIGHT", src="musl", dst="licenses")
+
+    def package_info(self):
+        # Setup the first sysroot and compiler flags
+        # This is a sysroot with just libc and linux headers
+        sysroot = self.package_folder
+        self.cpp_info.CHOST = self._triplet
+        flags = ["-nostdinc", "-target", self._triplet, f"--sysroot={sysroot}", f"-I{sysroot}/include"]
+        self.cpp_info.cflags = flags
+        self.cpp_info.cxxflags = flags
