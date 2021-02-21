@@ -16,30 +16,8 @@ class LlvmSysrootConan(ConanFile):
     # TODO: Check flags and options and make sure they are sane
 
     @property
-    def _musl_abi(self):
-        # Translate arch to musl abi
-        abi = {"armv6": "musleabihf",
-               "armv7": "musleabi",
-               "armv7hf": "musleabihf"}.get(str(self.settings.arch))
-        # Default to just "musl"
-        if abi == None:
-            abi = "musl"
-
-        return abi
-
-    @property
-    def _musl_arch(self):
-        # Translate conan arch to musl/clang arch
-        arch = {"armv6": "arm",
-                "armv8": "aarch64"}.get(str(self.settings.arch))
-        # Default to a one-to-one mapping
-        if arch == None:
-            arch = str(self.settings.arch)
-        return arch
-
-    @property
     def _triplet(self):
-        return "{}-linux-{}".format(self._musl_arch, self._musl_abi)
+        return self.deps_cpp_info["musl-headers"].CHOST
 
     def _force_host_context(self):
         # If this recipe is a "build_requires" in the host profile we force
