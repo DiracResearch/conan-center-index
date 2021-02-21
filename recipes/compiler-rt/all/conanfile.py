@@ -14,7 +14,6 @@ class CompilerRtConan(ConanFile):
     options = {"shared": [True, False], "fPIC": [True, False]}
     default_options = {"shared": False, "fPIC": True}
     topics = ("compiler-rt", "clang", "bulit-ins")
-    keep_imports = True
 
     def _force_host_context(self):
         # If this recipe is a "build_requires" in the host profile we force
@@ -36,8 +35,6 @@ class CompilerRtConan(ConanFile):
 
     def configure(self):
         self._force_host_context()
-        del self.settings.compiler.cppstd
-        del self.settings.compiler.libcxx
 
     def package_id(self):
         del self.info.settings.arch_target
@@ -49,15 +46,6 @@ class CompilerRtConan(ConanFile):
     def source(self):
         tools.get(**self.conan_data["sources"][self.version])
         os.rename(f"{self.name}-{self.version}.src", self.name)
-
-    def imports(self):
-        # We need the libraries and object files from compile-rt to create a
-        # temporary "sysroot" to build the rest of the sysroot (cxx for example)
-        self.copy("*", src="lib", dst=f"{self.package_folder}/lib")
-
-        # Copy linux headers to package folder. The package folder is used as
-        # the "sysroot"
-        self.copy("*.h", src="include", dst=f"{self.package_folder}/include")
 
     def build(self):
         # Tips and tricks from: https://llvm.org/docs/HowToCrossCompileBuiltinsOnArm.html
@@ -100,12 +88,6 @@ class CompilerRtConan(ConanFile):
     def package_info(self):
         # Setup the second sysroot and compiler flags
         # This is a sysroot with libc and linux headers together with compiler rt built-ins and crt
-        sysroot = self.package_folder
-        self.cpp_info.CHOST = self._triplet
-        self.cpp_info.cflags = [
-            "-nostdinc", "-target", self._triplet, f"--sysroot={sysroot}", f"-I{sysroot}/include"]
-
         self.cpp_info.LIBCC = "-lcompiler_rt"
-        linker_flags = ["-fuse-ld=lld", "-nostdlib", "-lcompiler_rt"]
+        linker_flags = ["-lcompiler_rt"]
         self.cpp_info.sharedlinkflags = linker_flags
-        self.cpp_info.exelinkflags = linker_flags
