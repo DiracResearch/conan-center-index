@@ -20,7 +20,6 @@ class MuslConan(ConanFile):
         "fPIC": True
     }
     topics = ("libc", "musl")
-    keep_imports = True
 
     @property
     def _triplet(self):
@@ -42,28 +41,17 @@ class MuslConan(ConanFile):
 
     def configure(self):
         self._force_host_context()
-        del self.settings.compiler.cppstd
-        del self.settings.compiler.libcxx
 
     def package_id(self):
         del self.info.settings.arch_target
         del self.info.settings.os_target
 
     def requirements(self):
-        self.requires(f"compiler-rt/10.0.0@dirac/testing")
-
-    def imports(self):
-        # We need the libraries and object files from compile-rt to create a
-        # temporary "sysroot" to build the rest of the sysroot (cxx for example)
-        self.copy("*", src="lib", dst=f"{self.package_folder}/lib")
-
-        # Copy linux headers to package folder. The package folder is used as
-        # the "sysroot"
-        self.copy("*.h", src="include", dst=f"{self.package_folder}/include")
+        self.requires("compiler-rt/10.0.0@dirac/testing")
 
     def source(self):
         tools.get(**self.conan_data["sources"][self.version])
-        os.rename(f"{self.name}-{self.version}", self.name)
+        os.rename("{}-{}".format(self.name, self.version), self.name)
 
     def build(self):
         with tools.chdir(self.name), \
@@ -78,16 +66,5 @@ class MuslConan(ConanFile):
         self.copy("COPYRIGHT", src="musl", dst="licenses")
 
     def package_info(self):
-        # Setup the third sysroot and compiler flags
-        # This is a sysroot with libc and linux headers together with compiler rt built-ins and crt
-        # and a libc
-        sysroot = self.package_folder
-        self.cpp_info.CHOST = self._triplet
-        flags = ["-nostdinc", "-target", self._triplet, f"--sysroot={sysroot}", f"-I{sysroot}/include"]
-        self.cpp_info.cflags = flags
-        self.cpp_info.cxxflags = flags
-
-        linker_flags = ["-fuse-ld=lld", "-nostdlib", "-lc", "-lcompiler_rt",
-                        f"{sysroot}/lib/crt1.o", f"{sysroot}/lib/crtendS.o", f"{sysroot}/lib/crtn.o", "-static"]
+        linker_flags = ["-lc"]
         self.cpp_info.sharedlinkflags = linker_flags
-        self.cpp_info.exelinkflags = linker_flags
