@@ -22,6 +22,18 @@ class ClangUnwindConan(ConanFile):
     topics = ("unwinder", "clang", "llvm")
 
     @property
+    def _musl_abi(self):
+        # Translate arch to musl abi
+        abi = {"armv6": "musleabihf",
+               "armv7": "musleabi",
+               "armv7hf": "musleabihf"}.get(str(self.settings.arch))
+        # Default to just "musl"
+        if abi == None:
+            abi = "musl"
+
+        return abi
+
+    @property
     def _musl_arch(self):
         # Translate conan arch to musl/clang arch
         arch = {"armv6": "arm",
